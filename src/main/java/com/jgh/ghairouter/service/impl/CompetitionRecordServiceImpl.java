@@ -84,7 +84,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         record.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
 
         //  获取文件后缀
-        String fileExtension = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf("."));
+        String fileExtension = "image/" + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".") + 1);
 
         boolean saved = this.save(record);
         if (!saved) {
