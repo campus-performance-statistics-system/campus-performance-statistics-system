@@ -55,6 +55,7 @@ create table if not exists activity_type
     description         varchar(512)                          null comment '活动类型描述',
     category_id         bigint                                not null comment '所属分类ID',
     competition_rank_id bigint                                null comment '关联竞赛等级ID',
+    sponsor_unit        varchar(512)                          null comment '颁奖/主办单位',
     sort_order          int         default 0                 not null comment '排序',
     create_time         datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time         datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
@@ -65,15 +66,15 @@ create table if not exists activity_type
 ) comment '活动类型' collate = utf8mb4_unicode_ci;
 
 -- 预置活动类型数据
-INSERT INTO activity_type (id, name, description, category_id, competition_rank_id, sort_order) VALUES
+INSERT INTO activity_type (id, name, description, category_id, competition_rank_id, sponsor_unit, sort_order) VALUES
 -- 服务类下的具体活动类型
-(1, '学校文体比赛', '学校组织的文艺、体育类比赛活动', 1, 4, 1),
-(2, '志愿服务活动', '校内外志愿服务活动记录', 1, 4, 2),
-(3, '学生社团活动', '学生社团组织的各类活动', 1, 4, 3),
+(1, '学校文体比赛', '学校组织的文艺、体育类比赛活动', 1, 4, '校团委/学工处', 1),
+(2, '志愿服务活动', '校内外志愿服务活动记录', 1, 4, '校团委/青年志愿者协会', 2),
+(3, '学生社团活动', '学生社团组织的各类活动', 1, 4, '校团委/社团联合会', 3),
 -- 个人业务类下的具体活动类型
-(4, '大学生创新创业训练计划', '大创项目申报与结题', 2, 1, 4),
-(5, '学科竞赛', '各类学科竞赛（教学创新、信息化、数字创意、课程思政等）', 2, 1, 5),
-(6, '技能证书', '各类专业技能证书考取', 2, 1, 6);
+(4, '大学生创新创业训练计划', '大创项目申报与结题', 2, 1, '教育部/学校教务处', 4),
+(5, '学科竞赛', '各类学科竞赛（教学创新、信息化、数字创意、课程思政等）', 2, 1, '教育部/各学科教指委', 5),
+(6, '技能证书', '各类专业技能证书考取', 2, 1, '相关行业认证机构', 6);
 
 -- ===================== 新增1：竞赛等级表 competition_rank =====================
 CREATE TABLE IF NOT EXISTS competition_rank

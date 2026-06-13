@@ -12,78 +12,43 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 活动类型 实体类（具体比赛/活动类型，隶属于某个分类）
+ * 教师个人竞赛得分明细
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("activity_type")
-public class ActivityType implements Serializable {
+@Table("teacher_competition_score")
+public class TeacherCompetitionScore implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * id
-     */
     @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
     private Long id;
 
-    /**
-     * 活动类型名称
-     */
-    @Column("name")
-    private String name;
+    @Column("record_id")
+    private Long recordId;
 
-    /**
-     * 活动类型描述
-     */
-    @Column("description")
-    private String description;
+    @Column("teacher_user_id")
+    private Long teacherUserId;
 
-    /**
-     * 所属分类ID
-     */
-    @Column("category_id")
-    private Long categoryId;
+    @Column("personal_score")
+    private BigDecimal personalScore;
 
-    /**
-     * 关联竞赛等级ID
-     */
-    @Column("competition_rank_id")
-    private Long competitionRankId;
+    @Column("is_leader")
+    private Integer isLeader;
 
-    /**
-     * 颁奖/主办单位
-     */
-    @Column("sponsor_unit")
-    private String sponsorUnit;
-
-    /**
-     * 排序
-     */
-    @Column("sort_order")
-    private Integer sortOrder;
-
-    /**
-     * 创建时间
-     */
     @Column("create_time")
     private LocalDateTime createTime;
 
-    /**
-     * 更新时间
-     */
     @Column("update_time")
     private LocalDateTime updateTime;
 
-    /**
-     * 是否删除
-     */
     @Column(value = "is_delete", isLogicDelete = true)
     private Integer isDelete;
 }

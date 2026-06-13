@@ -297,16 +297,15 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             User admin = userMapper.selectOneById(record.getAdminId());
             if (admin != null) vo.setAdminName(admin.getUserName());
         }
-        // 基础分
-        if (record.getCompetitionRankId() != null && record.getAwardGradeId() != null) {
-            RankGradeScore score = rankGradeScoreMapper.selectOneByQuery(
-                    QueryWrapper.create()
-                            .eq("rank_id", record.getCompetitionRankId())
-                            .eq("grade_id", record.getAwardGradeId()));
-            if (score != null) vo.setBaseScore(score.getBaseScore());
-        }
-        // 当前用户个人得分
+        // 当前用户个人得分 + 基础分（仅个人记录查询时返回，管理员审核列表不返回）
         if (currentUserId != null) {
+            if (record.getCompetitionRankId() != null && record.getAwardGradeId() != null) {
+                RankGradeScore score = rankGradeScoreMapper.selectOneByQuery(
+                        QueryWrapper.create()
+                                .eq("rank_id", record.getCompetitionRankId())
+                                .eq("grade_id", record.getAwardGradeId()));
+                if (score != null) vo.setBaseScore(score.getBaseScore());
+            }
             TeacherCompetitionScore ts = teacherScoreMapper.selectOneByQuery(
                     QueryWrapper.create()
                             .eq("record_id", record.getId())
