@@ -16,26 +16,38 @@ import java.util.List;
 public interface CompetitionRecordService extends IService<CompetitionRecord> {
 
     /**
-     * 提交比赛记录（含 multipart 图片文件）
+     * 提交比赛记录
      */
     Long addRecord(Long userId, Long categoryId, Long activityTypeId,
-                   String awardLevel, String firstAuthor,
-                   List<String> authors, MultipartFile file);
+                   Long competitionRankId, Long awardGradeId,
+                   String competitionName, String sponsorUnit,
+                   Integer teamMemberNum, Long firstAuthorId,
+                   List<Long> otherAuthorIds, MultipartFile file);
 
     /**
-     * 根据查询条件构造查询参数
+     * 构建查询条件
      */
     QueryWrapper getQueryWrapper(CompetitionQueryRequest queryRequest);
 
     /**
-     * 获取比赛记录VO
+     * 获取VO（含关联信息）
      */
     CompetitionRecordVO getRecordVO(CompetitionRecord record);
 
     /**
-     * 分页查询比赛记录（含关联信息）
+     * 获取VO并填充当前用户的个人得分
+     */
+    CompetitionRecordVO getRecordVO(CompetitionRecord record, Long currentUserId);
+
+    /**
+     * 分页查询
      */
     Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest queryRequest);
+
+    /**
+     * 分页查询（含个人得分）
+     */
+    Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest queryRequest, Long currentUserId);
 
     /**
      * 管理员审核

@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -22,10 +23,19 @@ public class CompetitionRecordVO implements Serializable {
     private String categoryName;
     private Long activityTypeId;
     private String activityTypeName;
+    private Long competitionRankId;
+    private String competitionRankName;
+    private Long awardGradeId;
+    private String awardGradeName;
     private String competitionName;
-    private String awardLevel;
-    private String firstAuthor;
-    private String otherAuthors;
+    private String sponsorUnit;
+    private Integer teamMemberNum;
+    private Long distributeRuleId;
+    private String distributeRuleDesc;
+    private Long firstAuthorId;
+    private String firstAuthorName;
+    private String otherAuthorIds;
+    private String otherAuthorNames;
     private String proofImageData;
     private String autoReviewStatus;
     private String autoReviewComment;
@@ -36,4 +46,9 @@ public class CompetitionRecordVO implements Serializable {
     private LocalDateTime adminReviewTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    // === 计分相关 ===
+    private BigDecimal baseScore;
+    // === 个人得分（仅当前登录用户）===
+    private BigDecimal personalScore;
 }

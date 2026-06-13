@@ -27,111 +27,90 @@ public class CompetitionRecord implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * id
-     */
     @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
     private Long id;
 
-    /**
-     * 参赛用户ID
-     */
+    /** 填报用户ID */
     @Column("user_id")
     private Long userId;
 
-    /**
-     * 分类ID
-     */
+    /** 比赛大类ID */
     @Column("category_id")
     private Long categoryId;
 
-    /**
-     * 活动类型ID
-     */
+    /** 活动细分类型ID */
     @Column("activity_type_id")
     private Long activityTypeId;
 
-    /**
-     * 比赛名称
-     */
+    /** 竞赛层级ID */
+    @Column("competition_rank_id")
+    private Long competitionRankId;
+
+    /** 获奖等级ID */
+    @Column("award_grade_id")
+    private Long awardGradeId;
+
+    /** 比赛全称 */
     @Column("competition_name")
     private String competitionName;
 
-    /**
-     * 获奖等级
-     */
-    @Column("award_level")
-    private String awardLevel;
+    /** 颁奖/主办单位 */
+    @Column("sponsor_unit")
+    private String sponsorUnit;
 
-    /**
-     * 第一作者
-     */
-    @Column("first_author")
-    private String firstAuthor;
+    /** 参赛总人数 */
+    @Column("team_member_num")
+    private Integer teamMemberNum;
 
-    /**
-     * 其他作者（逗号分隔）
-     */
-    @Column("other_authors")
-    private String otherAuthors;
+    /** 分数分配规则ID */
+    @Column("distribute_rule_id")
+    private Long distributeRuleId;
 
-    /**
-     * 参赛/获奖证明图片（base64数据）
-     */
+    /** 第一负责人用户ID */
+    @Column("first_author_id")
+    private Long firstAuthorId;
+
+    /** 其他参赛教师ID（逗号分隔） */
+    @Column("other_author_ids")
+    private String otherAuthorIds;
+
+    /** 参赛/获奖证明图片（base64数据） */
     @Column("proof_image_data")
     private String proofImageData;
 
-    /**
-     * 自动审核状态：PENDING/PASSED/FAILED
-     */
+    /** 自动审核状态 */
     @Column("auto_review_status")
     private String autoReviewStatus;
 
-    /**
-     * AI自动审核分析意见
-     */
+    /** AI自动审核分析意见 */
     @Column("auto_review_comment")
     private String autoReviewComment;
 
-    /**
-     * 管理员审核状态：PENDING/PASSED/FAILED
-     */
+    /** 管理员审核状态 */
     @Column("admin_review_status")
     private String adminReviewStatus;
 
-    /**
-     * 管理员审核意见
-     */
+    /** 管理员审核意见 */
     @Column("admin_review_comment")
     private String adminReviewComment;
 
-    /**
-     * 审核管理员ID
-     */
+    /** 审核管理员ID */
     @Column("admin_id")
     private Long adminId;
 
-    /**
-     * 管理员审核时间
-     */
+    /** 管理员审核时间 */
     @Column("admin_review_time")
     private LocalDateTime adminReviewTime;
 
-    /**
-     * 创建时间
-     */
+    /** 创建时间 */
     @Column("create_time")
     private LocalDateTime createTime;
 
-    /**
-     * 更新时间
-     */
+    /** 更新时间 */
     @Column("update_time")
     private LocalDateTime updateTime;
 
-    /**
-     * 是否删除
-     */
+    /** 是否删除 */
     @Column(value = "is_delete", isLogicDelete = true)
     private Integer isDelete;
 }

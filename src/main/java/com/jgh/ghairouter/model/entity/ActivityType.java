@@ -52,6 +52,12 @@ public class ActivityType implements Serializable {
     private Long categoryId;
 
     /**
+     * 关联竞赛等级ID
+     */
+    @Column("competition_rank_id")
+    private Long competitionRankId;
+
+    /**
      * 排序
      */
     @Column("sort_order")
