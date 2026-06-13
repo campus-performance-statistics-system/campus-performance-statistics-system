@@ -11,8 +11,8 @@ public interface AiReviewService {
      *
      * @param recordId        比赛记录ID
      * @param competitionName 比赛名称
-     * @param imageBase64     证明图片的 base64 data URL（data:image/xxx;base64,...）
-     * @param fileExtension
+     * @param imageBase64     证明图片的 base64 数据
+     * @param mimeType        图片 MIME 类型（如 image/png、image/jpeg）
      */
-    void autoReview(Long recordId, String competitionName, String imageBase64, String fileExtension);
+    void autoReview(Long recordId, String competitionName, String imageBase64, String mimeType);
 }

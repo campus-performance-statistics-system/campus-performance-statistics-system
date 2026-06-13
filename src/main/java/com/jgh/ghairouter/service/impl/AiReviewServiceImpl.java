@@ -36,7 +36,7 @@ public class AiReviewServiceImpl implements AiReviewService {
 
     @Async
     @Override
-    public void autoReview(Long recordId, String competitionName, String imageBase64, String fileExtension) {
+    public void autoReview(Long recordId, String competitionName, String imageBase64, String mimeType) {
         log.info("开始自动审核记录: recordId={}, competitionName={}", recordId, competitionName);
 
         String comment;
@@ -57,7 +57,7 @@ public class AiReviewServiceImpl implements AiReviewService {
                     .prompt()
                     .user(userSpec -> userSpec
                             .text(prompt)
-                            .media(MimeTypeUtils.parseMimeType(fileExtension),
+                            .media(MimeTypeUtils.parseMimeType(mimeType),
                                     new ByteArrayResource(imageBytes))
                     )
                     .call()

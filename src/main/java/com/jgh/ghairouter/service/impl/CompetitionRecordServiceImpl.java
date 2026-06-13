@@ -83,8 +83,11 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         record.setAutoReviewStatus(ReviewStatusEnum.PENDING.getValue());
         record.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
 
-        //  获取文件后缀
-        String fileExtension = "image/" + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".") + 1);
+        // 获取文件 MIME 类型
+        String mimeType = file.getContentType();
+        if (StrUtil.isBlank(mimeType)) {
+            mimeType = "image/png";
+        }
 
         boolean saved = this.save(record);
         if (!saved) {
@@ -93,7 +96,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
         // 异步触发AI自动审核（传递 base64 数据）
         try {
-            aiReviewService.autoReview(record.getId(), competitionName, base64, fileExtension);
+            aiReviewService.autoReview(record.getId(), competitionName, base64, mimeType);
         } catch (Exception e) {
             log.error("触发AI自动审核失败", e);
         }
