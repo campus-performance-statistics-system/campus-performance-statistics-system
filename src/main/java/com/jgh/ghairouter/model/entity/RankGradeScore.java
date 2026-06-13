@@ -34,8 +34,8 @@ public class RankGradeScore implements Serializable {
     @Column("rank_id")
     private Long rankId;
 
-    @Column("grade_id")
-    private Long gradeId;
+    @Column("grade_name")
+    private String gradeName;
 
     @Column("base_score")
     private BigDecimal baseScore;

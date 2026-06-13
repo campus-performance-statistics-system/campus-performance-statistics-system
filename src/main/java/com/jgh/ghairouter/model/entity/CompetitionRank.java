@@ -33,9 +33,6 @@ public class CompetitionRank implements Serializable {
     @Column("rank_name")
     private String rankName;
 
-    @Column("rank_code")
-    private String rankCode;
-
     @Column("sort_order")
     private Integer sortOrder;
 

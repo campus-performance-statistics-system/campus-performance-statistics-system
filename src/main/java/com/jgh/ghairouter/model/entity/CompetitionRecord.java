@@ -42,13 +42,9 @@ public class CompetitionRecord implements Serializable {
     @Column("activity_type_id")
     private Long activityTypeId;
 
-    /** 竞赛层级ID */
-    @Column("competition_rank_id")
-    private Long competitionRankId;
-
-    /** 获奖等级ID */
-    @Column("award_grade_id")
-    private Long awardGradeId;
+    /** 竞赛等级+获奖等级计分规则ID */
+    @Column("rank_grade_score_id")
+    private Long rankGradeScoreId;
 
     /** 比赛全称 */
     @Column("competition_name")

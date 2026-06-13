@@ -15,42 +15,16 @@ import java.util.List;
  */
 public interface CompetitionRecordService extends IService<CompetitionRecord> {
 
-    /**
-     * 提交比赛记录
-     */
     Long addRecord(Long userId, Long categoryId, Long activityTypeId,
-                   Long competitionRankId, Long awardGradeId,
-                   String competitionName, String sponsorUnit,
+                   Long rankGradeScoreId, String competitionName, String sponsorUnit,
                    Integer teamMemberNum, Long firstAuthorId,
                    List<Long> otherAuthorIds, MultipartFile file);
 
-    /**
-     * 构建查询条件
-     */
     QueryWrapper getQueryWrapper(CompetitionQueryRequest queryRequest);
 
-    /**
-     * 获取VO（含关联信息）
-     */
     CompetitionRecordVO getRecordVO(CompetitionRecord record);
 
-    /**
-     * 获取VO并填充当前用户的个人得分
-     */
-    CompetitionRecordVO getRecordVO(CompetitionRecord record, Long currentUserId);
-
-    /**
-     * 分页查询
-     */
     Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest queryRequest);
 
-    /**
-     * 分页查询（含个人得分）
-     */
-    Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest queryRequest, Long currentUserId);
-
-    /**
-     * 管理员审核
-     */
     void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId);
 }

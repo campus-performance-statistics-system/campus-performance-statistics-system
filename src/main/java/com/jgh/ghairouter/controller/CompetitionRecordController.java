@@ -34,14 +34,12 @@ public class CompetitionRecordController {
     @Resource
     private UserService userService;
 
-    /** 提交比赛记录 */
     @PostMapping("/add")
     @Operation(summary = "提交比赛记录")
     public BaseResponse<Long> addRecord(
             @RequestParam("categoryId") Long categoryId,
             @RequestParam("activityTypeId") Long activityTypeId,
-            @RequestParam("competitionRankId") Long competitionRankId,
-            @RequestParam("awardGradeId") Long awardGradeId,
+            @RequestParam("rankGradeScoreId") Long rankGradeScoreId,
             @RequestParam("competitionName") String competitionName,
             @RequestParam(value = "sponsorUnit", required = false) String sponsorUnit,
             @RequestParam(value = "teamMemberNum", defaultValue = "1") Integer teamMemberNum,
@@ -52,13 +50,11 @@ public class CompetitionRecordController {
         User loginUser = userService.getLoginUser(httpRequest);
         Long recordId = competitionRecordService.addRecord(
                 loginUser.getId(), categoryId, activityTypeId,
-                competitionRankId, awardGradeId,
-                competitionName, sponsorUnit,
+                rankGradeScoreId, competitionName, sponsorUnit,
                 teamMemberNum, firstAuthorId, otherAuthorIds, file);
         return ResultUtils.success(recordId);
     }
 
-    /** 我的记录（含个人得分） */
     @PostMapping("/my/list/page")
     @Operation(summary = "查看我的比赛记录")
     public BaseResponse<Page<CompetitionRecordVO>> listMyRecords(
@@ -67,23 +63,19 @@ public class CompetitionRecordController {
         ThrowUtils.throwIf(queryRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
         queryRequest.setUserId(loginUser.getId());
-        Page<CompetitionRecordVO> page = competitionRecordService.pageRecords(queryRequest, loginUser.getId());
-        return ResultUtils.success(page);
+        return ResultUtils.success(competitionRecordService.pageRecords(queryRequest));
     }
 
-    /** 单条详情 */
     @GetMapping("/get/{id}")
     @Operation(summary = "查看记录详情")
-    public BaseResponse<CompetitionRecordVO> getRecordById(@PathVariable Long id, HttpServletRequest httpRequest) {
+    public BaseResponse<CompetitionRecordVO> getRecordById(@PathVariable Long id) {
         ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
-        User loginUser = userService.getLoginUser(httpRequest);
         CompetitionRecordVO vo = competitionRecordService.getRecordVO(
-                competitionRecordService.getById(id), loginUser.getId());
+                competitionRecordService.getById(id));
         ThrowUtils.throwIf(vo == null, ErrorCode.NOT_FOUND_ERROR);
         return ResultUtils.success(vo);
     }
 
-    /** 删除 */
     @PostMapping("/delete")
     @Operation(summary = "删除比赛记录")
     public BaseResponse<Boolean> deleteRecord(@RequestBody DeleteRequest deleteRequest, HttpServletRequest httpRequest) {
@@ -98,7 +90,6 @@ public class CompetitionRecordController {
         return ResultUtils.success(competitionRecordService.removeById(deleteRequest.getId()));
     }
 
-    /** 管理员分页 */
     @PostMapping("/admin/list/page")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员查看所有记录")
@@ -108,7 +99,6 @@ public class CompetitionRecordController {
         return ResultUtils.success(competitionRecordService.pageRecords(queryRequest));
     }
 
-    /** 管理员审核 */
     @PostMapping("/admin/review")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员审核")

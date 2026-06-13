@@ -23,13 +23,6 @@ public class RankGradeScoreServiceImpl
     public List<RankGradeScore> listByRankId(Long rankId) {
         return this.list(QueryWrapper.create()
                 .eq("rank_id", rankId)
-                .orderBy("grade_id", true));
-    }
-
-    @Override
-    public RankGradeScore getByRankAndGrade(Long rankId, Long gradeId) {
-        return this.getOne(QueryWrapper.create()
-                .eq("rank_id", rankId)
-                .eq("grade_id", gradeId));
+                .orderBy("id", true));
     }
 }

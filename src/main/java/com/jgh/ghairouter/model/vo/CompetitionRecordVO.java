@@ -23,9 +23,8 @@ public class CompetitionRecordVO implements Serializable {
     private String categoryName;
     private Long activityTypeId;
     private String activityTypeName;
-    private Long competitionRankId;
+    private Long rankGradeScoreId;
     private String competitionRankName;
-    private Long awardGradeId;
     private String awardGradeName;
     private String competitionName;
     private String sponsorUnit;
@@ -46,9 +45,4 @@ public class CompetitionRecordVO implements Serializable {
     private LocalDateTime adminReviewTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
-
-    // === 计分相关 ===
-    private BigDecimal baseScore;
-    // === 个人得分（仅当前登录用户）===
-    private BigDecimal personalScore;
 }

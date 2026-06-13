@@ -20,8 +20,6 @@ public class CompetitionQueryRequest extends PageRequest {
     private Long userId;
     private Long categoryId;
     private Long activityTypeId;
-    private Long competitionRankId;
-    private Long awardGradeId;
     private String competitionName;
     private String autoReviewStatus;
     private String adminReviewStatus;

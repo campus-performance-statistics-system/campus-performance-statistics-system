@@ -8,5 +8,4 @@ import java.util.List;
 public interface RankGradeScoreService extends IService<RankGradeScore> {
     List<RankGradeScore> listAll();
     List<RankGradeScore> listByRankId(Long rankId);
-    RankGradeScore getByRankAndGrade(Long rankId, Long gradeId);
 }

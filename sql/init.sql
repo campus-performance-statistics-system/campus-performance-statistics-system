@@ -81,87 +81,55 @@ CREATE TABLE IF NOT EXISTS competition_rank
 (
     id          BIGINT AUTO_INCREMENT COMMENT '主键ID' PRIMARY KEY,
     rank_name   VARCHAR(64) NOT NULL COMMENT '竞赛层级名称：校级/区级/自治区级行业性/国家级',
-    rank_code   VARCHAR(32) NOT NULL COMMENT '层级编码（方便程序判断）',
     sort_order  INT DEFAULT 0 NOT NULL COMMENT '排序：国家级1>自治区2>区级3>校级4',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
     is_delete   TINYINT DEFAULT 0 NOT NULL,
-    UNIQUE KEY uk_rank_code(rank_code),
     UNIQUE KEY uk_rank_name(rank_name)
 ) COMMENT '竞赛等级（赛事主办层级）' COLLATE = utf8mb4_unicode_ci;
 
--- 预置层级数据（按表格备注提取）
-INSERT INTO competition_rank(rank_name, rank_code, sort_order) VALUES
-                                                                   ('国家级', 'NATIONAL', 1),
-                                                                   ('自治区级行业性', 'AUTONOMY_INDUSTRY', 2),
-                                                                   ('区级', 'REGIONAL', 3),
-                                                                   ('校级', 'SCHOOL', 4);
+-- 预置层级数据
+INSERT INTO competition_rank(rank_name, sort_order) VALUES
+                                                       ('国家级', 1),
+                                                       ('自治区级行业性', 2),
+                                                       ('区级', 3),
+                                                       ('校级', 4);
 
--- ===================== 新增2：获奖等级表 award_grade =====================
-CREATE TABLE IF NOT EXISTS award_grade
-(
-    id          BIGINT AUTO_INCREMENT COMMENT '主键ID' PRIMARY KEY,
-    grade_name  VARCHAR(64) NOT NULL COMMENT '获奖等级：一等奖/二等奖/三等奖/优秀奖/未获奖',
-    grade_code  VARCHAR(32) NOT NULL COMMENT '等级编码',
-    sort_order  INT DEFAULT 0 NOT NULL,
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
-    is_delete   TINYINT DEFAULT 0 NOT NULL,
-    UNIQUE KEY uk_grade_code(grade_code),
-    UNIQUE KEY uk_grade_name(grade_name)
-) COMMENT '获奖等级' COLLATE = utf8mb4_unicode_ci;
-
--- 预置获奖等级
-INSERT INTO award_grade(grade_name, grade_code, sort_order) VALUES
-                                                                ('一等奖', 'FIRST', 1),
-                                                                ('二等奖', 'SECOND', 2),
-                                                                ('三等奖', 'THIRD', 3),
-                                                                ('优秀奖', 'EXCELLENT', 4),
-                                                                ('未获奖', 'NONE', 5);
-
--- ===================== 新增3：竞赛等级-获奖等级 多对多计分关联表 rank_grade_score =====================
--- 核心规则来自表格备注：
--- 校级：参与2分/项（负责人）
--- 区级：一等2分、其他1.5、优秀奖1分
--- 自治区行业：一等7分
--- 国家级：一等15、二等12、三等10分
+-- ===================== 新增2：竞赛等级-获奖等级计分表 rank_grade_score =====================
+-- 获奖等级直接以 grade_name 存储，不再单独建表
 CREATE TABLE IF NOT EXISTS rank_grade_score
 (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     rank_id         BIGINT NOT NULL COMMENT '竞赛等级ID，关联competition_rank',
-    grade_id        BIGINT NOT NULL COMMENT '获奖等级ID，关联award_grade',
+    grade_name      VARCHAR(64) NOT NULL COMMENT '获奖等级名称：一等奖/二等奖/三等奖/优秀奖/未获奖',
     base_score      DECIMAL(5,2) NOT NULL COMMENT '该组合基础总分',
     remark          VARCHAR(512) NULL COMMENT '计分备注说明',
     create_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
     update_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
     is_delete       TINYINT DEFAULT 0 NOT NULL,
-    -- 联合唯一约束：同一个层级+奖项只能一条计分规则
-    UNIQUE KEY uk_rank_grade(rank_id, grade_id),
-    -- 外键关联
+    UNIQUE KEY uk_rank_grade(rank_id, grade_name),
     FOREIGN KEY fk_rank(rank_id) REFERENCES competition_rank(id),
-    FOREIGN KEY fk_grade(grade_id) REFERENCES award_grade(id),
-    INDEX idx_rank_id(rank_id),
-    INDEX idx_grade_id(grade_id)
-) COMMENT '竞赛层级-获奖等级计分规则（多对多中间表）' COLLATE = utf8mb4_unicode_ci;
+    INDEX idx_rank_id(rank_id)
+) COMMENT '竞赛层级-获奖等级计分规则' COLLATE = utf8mb4_unicode_ci;
 
 -- 批量插入计分规则（完全匹配表格备注）
-INSERT INTO rank_grade_score(rank_id, grade_id, base_score, remark) VALUES
--- 1. 国家级
-((SELECT id FROM competition_rank WHERE rank_code='NATIONAL'), (SELECT id FROM award_grade WHERE grade_code='FIRST'), 15.00, '国家级一等奖15分'),
-((SELECT id FROM competition_rank WHERE rank_code='NATIONAL'), (SELECT id FROM award_grade WHERE grade_code='SECOND'), 12.00, '国家级二等奖12分'),
-((SELECT id FROM competition_rank WHERE rank_code='NATIONAL'), (SELECT id FROM award_grade WHERE grade_code='THIRD'), 10.00, '国家级三等奖10分'),
--- 2. 自治区级行业性
-((SELECT id FROM competition_rank WHERE rank_code='AUTONOMY_INDUSTRY'), (SELECT id FROM award_grade WHERE grade_code='FIRST'), 7.00, '自治区级行业性一等奖7分'),
--- 3. 区级
-((SELECT id FROM competition_rank WHERE rank_code='REGIONAL'), (SELECT id FROM award_grade WHERE grade_code='FIRST'), 2.00, '区级一等奖2分'),
-((SELECT id FROM competition_rank WHERE rank_code='REGIONAL'), (SELECT id FROM award_grade WHERE grade_code='SECOND'), 1.50, '区级二等奖1.5分'),
-((SELECT id FROM competition_rank WHERE rank_code='REGIONAL'), (SELECT id FROM award_grade WHERE grade_code='THIRD'), 1.50, '区级三等奖1.5分'),
-((SELECT id FROM competition_rank WHERE rank_code='REGIONAL'), (SELECT id FROM award_grade WHERE grade_code='EXCELLENT'), 1.00, '区级优秀奖1分'),
--- 4. 校级（无论奖项，参与即2分）
-((SELECT id FROM competition_rank WHERE rank_code='SCHOOL'), (SELECT id FROM award_grade WHERE grade_code='FIRST'), 2.00, '校级参与2分（负责人）'),
-((SELECT id FROM competition_rank WHERE rank_code='SCHOOL'), (SELECT id FROM award_grade WHERE grade_code='SECOND'), 2.00, '校级参与2分（负责人）'),
-((SELECT id FROM competition_rank WHERE rank_code='SCHOOL'), (SELECT id FROM award_grade WHERE grade_code='THIRD'), 2.00, '校级参与2分（负责人）'),
-((SELECT id FROM competition_rank WHERE rank_code='SCHOOL'), (SELECT id FROM award_grade WHERE grade_code='NONE'), 2.00, '校级未获奖参与2分');
+INSERT INTO rank_grade_score(rank_id, grade_name, base_score, remark) VALUES
+-- 1. 国家级 (rank_id=1)
+(1, '一等奖', 15.00, '国家级一等奖15分'),
+(1, '二等奖', 12.00, '国家级二等奖12分'),
+(1, '三等奖', 10.00, '国家级三等奖10分'),
+-- 2. 自治区级行业性 (rank_id=2)
+(2, '一等奖', 7.00, '自治区级行业性一等奖7分'),
+-- 3. 区级 (rank_id=3)
+(3, '一等奖', 2.00, '区级一等奖2分'),
+(3, '二等奖', 1.50, '区级二等奖1.5分'),
+(3, '三等奖', 1.50, '区级三等奖1.5分'),
+(3, '优秀奖', 1.00, '区级优秀奖1分'),
+-- 4. 校级 (rank_id=4)（无论奖项，参与即2分）
+(4, '一等奖', 2.00, '校级参与2分（负责人）'),
+(4, '二等奖', 2.00, '校级参与2分（负责人）'),
+(4, '三等奖', 2.00, '校级参与2分（负责人）'),
+(4, '未获奖', 2.00, '校级未获奖参与2分');
 
 -- ===================== 新增4：团队分数分配规则表 score_distribute_rule =====================
 -- 规则来源表格底部备注：
@@ -194,8 +162,7 @@ create table if not exists competition_record
     user_id              bigint                                not null comment '填报用户ID',
     category_id          bigint                                not null comment '比赛大类ID',
     activity_type_id     bigint                                null comment '活动细分类型ID',
-    competition_rank_id bigint                                not null comment '竞赛层级ID（关联competition_rank）',
-    award_grade_id      bigint                                not null comment '获奖等级ID（关联award_grade）',
+    rank_grade_score_id  bigint                                null comment '竞赛等级+获奖等级计分规则ID（关联rank_grade_score）',
     competition_name     varchar(256)                          not null comment '比赛全称',
     sponsor_unit         varchar(512)                          null comment '颁奖/主办单位',
     team_member_num      int                                   not null default 1 comment '参赛总人数（1=单人参赛）',
@@ -216,14 +183,12 @@ create table if not exists competition_record
     INDEX idx_user_id (user_id),
     INDEX idx_category_id (category_id),
     INDEX idx_activity_type_id (activity_type_id),
-    INDEX idx_competition_rank_id (competition_rank_id),
-    INDEX idx_award_grade_id (award_grade_id),
+    INDEX idx_rank_grade_score_id (rank_grade_score_id),
     INDEX idx_distribute_rule_id (distribute_rule_id),
     INDEX idx_auto_review_status (auto_review_status),
     INDEX idx_admin_review_status (admin_review_status),
     -- 外键约束
-    FOREIGN KEY fk_record_rank(competition_rank_id) REFERENCES competition_rank(id),
-    FOREIGN KEY fk_record_grade(award_grade_id) REFERENCES award_grade(id),
+    FOREIGN KEY fk_record_rank_grade(rank_grade_score_id) REFERENCES rank_grade_score(id),
     FOREIGN KEY fk_record_distribute(distribute_rule_id) REFERENCES score_distribute_rule(id)
 ) comment '比赛记录（教师竞赛获奖台账）' collate = utf8mb4_unicode_ci;
 
