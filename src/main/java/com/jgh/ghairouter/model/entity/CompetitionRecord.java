@@ -52,10 +52,28 @@ public class CompetitionRecord implements Serializable {
     private String competitionName;
 
     /**
-     * 参赛/获奖证明图片URL
+     * 获奖等级
      */
-    @Column("proof_image_url")
-    private String proofImageUrl;
+    @Column("award_level")
+    private String awardLevel;
+
+    /**
+     * 第一作者
+     */
+    @Column("first_author")
+    private String firstAuthor;
+
+    /**
+     * 其他作者（逗号分隔）
+     */
+    @Column("other_authors")
+    private String otherAuthors;
+
+    /**
+     * 参赛/获奖证明图片（base64数据）
+     */
+    @Column("proof_image_data")
+    private String proofImageData;
 
     /**
      * 自动审核状态：PENDING/PASSED/FAILED

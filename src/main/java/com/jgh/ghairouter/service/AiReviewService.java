@@ -11,7 +11,8 @@ public interface AiReviewService {
      *
      * @param recordId        比赛记录ID
      * @param competitionName 比赛名称
-     * @param imageUrl        证明图片URL
+     * @param imageBase64     证明图片的 base64 data URL（data:image/xxx;base64,...）
+     * @param fileExtension
      */
-    void autoReview(Long recordId, String competitionName, String imageUrl);
+    void autoReview(Long recordId, String competitionName, String imageBase64, String fileExtension);
 }

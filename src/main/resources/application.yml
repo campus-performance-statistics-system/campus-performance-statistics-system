@@ -14,11 +14,11 @@ spring:
       chat:
         options:
           model: qwen2.5-omni-7b
-  # 静态资源配置
-  web:
-    resources:
-      static-locations: classpath:/static/,file:uploads/
-
+  # 文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 # MyBatis Flex 公共配置
 mybatis-flex:
   configuration:
@@ -32,11 +32,6 @@ server:
     session:
       cookie:
         max-age: 2592000  # cookie 30 天过期
-
-# 应用自定义配置
-app:
-  upload:
-    dir: uploads
 
 # springdoc-openapi 公共配置
 springdoc:

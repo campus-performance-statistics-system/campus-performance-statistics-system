@@ -9,7 +9,6 @@ import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.exception.ThrowUtils;
 import com.jgh.ghairouter.model.dto.competition.AdminReviewRequest;
-import com.jgh.ghairouter.model.dto.competition.CompetitionAddRequest;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.User;
 import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
@@ -21,6 +20,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 比赛记录控制器
@@ -37,19 +39,26 @@ public class CompetitionRecordController {
     private UserService userService;
 
     /**
-     * 提交比赛记录（参赛人员）
+     * 提交比赛记录（multipart：表单字段 + 图片文件）
      */
     @PostMapping("/add")
     @Operation(summary = "提交比赛记录")
-    public BaseResponse<Long> addRecord(@RequestBody CompetitionAddRequest request, HttpServletRequest httpRequest) {
-        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+    public BaseResponse<Long> addRecord(
+            @RequestParam("categoryId") Long categoryId,
+            @RequestParam("awardLevel") String awardLevel,
+            @RequestParam("firstAuthor") String firstAuthor,
+            @RequestParam(value = "authors", required = false) List<String> authors,
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
 
         Long recordId = competitionRecordService.addRecord(
                 loginUser.getId(),
-                request.getCompetitionName(),
-                request.getCategoryId(),
-                request.getProofImageUrl()
+                categoryId,
+                awardLevel,
+                firstAuthor,
+                authors,
+                file
         );
         return ResultUtils.success(recordId);
     }

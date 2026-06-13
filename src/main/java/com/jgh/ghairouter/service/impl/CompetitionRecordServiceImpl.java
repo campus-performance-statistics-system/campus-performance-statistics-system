@@ -22,11 +22,12 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -46,12 +47,26 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     @Resource
     private CategoryMapper categoryMapper;
 
+
     @Override
-    public Long addRecord(Long userId, String competitionName, Long categoryId, String proofImageUrl) {
+    public Long addRecord(Long userId, Long categoryId, String awardLevel,
+                          String firstAuthor, List<String> authors, MultipartFile file) {
         // 校验分类是否存在
         Category category = categoryMapper.selectOneById(categoryId);
         if (category == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "比赛分类不存在");
+        }
+
+        // 比赛名称 = 所选子分类名称
+        String competitionName = category.getName();
+
+        // 读取文件并转为 base64
+        String base64 = null;
+        try {
+            byte[] bytes = file.getBytes();
+            base64 = Base64.getEncoder().encodeToString(bytes);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "读取文件失败");
         }
 
         // 创建记录
@@ -59,21 +74,28 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         record.setUserId(userId);
         record.setCategoryId(categoryId);
         record.setCompetitionName(competitionName);
-        record.setProofImageUrl(proofImageUrl);
+        record.setAwardLevel(awardLevel);
+        record.setFirstAuthor(firstAuthor);
+        if (CollUtil.isNotEmpty(authors)) {
+            record.setOtherAuthors(String.join(",", authors));
+        }
+        record.setProofImageData(base64);
         record.setAutoReviewStatus(ReviewStatusEnum.PENDING.getValue());
         record.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
+
+        //  获取文件后缀
+        String fileExtension = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf("."));
 
         boolean saved = this.save(record);
         if (!saved) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "提交比赛记录失败");
         }
 
-        // 异步触发AI自动审核
+        // 异步触发AI自动审核（传递 base64 数据）
         try {
-            aiReviewService.autoReview(record.getId(), competitionName, proofImageUrl);
+            aiReviewService.autoReview(record.getId(), competitionName, base64, fileExtension);
         } catch (Exception e) {
             log.error("触发AI自动审核失败", e);
-            // 自动审核触发失败不阻塞用户提交
         }
 
         return record.getId();

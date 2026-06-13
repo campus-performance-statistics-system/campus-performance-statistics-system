@@ -6,6 +6,9 @@ import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 比赛记录 服务层
@@ -13,9 +16,10 @@ import com.mybatisflex.core.service.IService;
 public interface CompetitionRecordService extends IService<CompetitionRecord> {
 
     /**
-     * 提交比赛记录（参赛人员）
+     * 提交比赛记录（含 multipart 图片文件）
      */
-    Long addRecord(Long userId, String competitionName, Long categoryId, String proofImageUrl);
+    Long addRecord(Long userId, Long categoryId, String awardLevel,
+                   String firstAuthor, List<String> authors, MultipartFile file);
 
     /**
      * 根据查询条件构造查询参数
