@@ -72,7 +72,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         // 创建记录
         CompetitionRecord record = new CompetitionRecord();
         record.setUserId(userId);
-        record.setCategoryId(categoryId);
+        record.setCategoryId(category.getParentId());
         record.setCompetitionName(competitionName);
         record.setAwardLevel(awardLevel);
         record.setFirstAuthor(firstAuthor);

@@ -8,12 +8,6 @@ spring:
   # Session 配置
   session:
     timeout: 2592000  # session 30 天过期
-  # AI 模型配置（公共）
-  ai:
-    dashscope:
-      chat:
-        options:
-          model: qwen2.5-omni-7b
   # 文件上传大小限制
   servlet:
     multipart:
