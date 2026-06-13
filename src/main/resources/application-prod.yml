@@ -10,7 +10,7 @@ spring:
   # 生产 Redis（通过环境变量注入）
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
   # AI API Key（通过环境变量注入）
