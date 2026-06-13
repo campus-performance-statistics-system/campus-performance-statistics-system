@@ -8,6 +8,8 @@ import com.jgh.ghairouter.constant.UserConstant;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.exception.ThrowUtils;
+import com.jgh.ghairouter.mapper.CompetitionRankMapper;
+import com.jgh.ghairouter.model.entity.CompetitionRank;
 import com.jgh.ghairouter.model.entity.RankGradeScore;
 import com.jgh.ghairouter.service.RankGradeScoreService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,9 @@ public class RankGradeScoreController {
 
     @Resource
     private RankGradeScoreService rankGradeScoreService;
+
+    @Resource
+    private CompetitionRankMapper competitionRankMapper;
 
     @GetMapping("/list")
     @Operation(summary = "获取计分规则列表（可按竞赛等级筛选）")
@@ -48,6 +53,13 @@ public class RankGradeScoreController {
     @Operation(summary = "新增计分规则")
     public BaseResponse<Long> add(@RequestBody RankGradeScore entity) {
         ThrowUtils.throwIf(entity == null, ErrorCode.PARAMS_ERROR);
+        // 自动生成备注：竞赛等级 + 获奖等级 + 分值，如"国家级一等奖15分"
+        if (entity.getRankId() != null) {
+            CompetitionRank rank = competitionRankMapper.selectOneById(entity.getRankId());
+            if (rank != null) {
+                entity.setRemark(rank.getRankName() + entity.getGradeName() + entity.getBaseScore() + "分");
+            }
+        }
         rankGradeScoreService.save(entity);
         return ResultUtils.success(entity.getId());
     }
