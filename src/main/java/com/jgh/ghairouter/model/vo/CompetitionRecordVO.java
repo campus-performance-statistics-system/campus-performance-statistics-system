@@ -20,6 +20,8 @@ public class CompetitionRecordVO implements Serializable {
     private String userName;
     private Long categoryId;
     private String categoryName;
+    private Long activityTypeId;
+    private String activityTypeName;
     private String competitionName;
     private String awardLevel;
     private String firstAuthor;

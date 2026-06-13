@@ -46,6 +46,12 @@ public class CompetitionRecord implements Serializable {
     private Long categoryId;
 
     /**
+     * 活动类型ID
+     */
+    @Column("activity_type_id")
+    private Long activityTypeId;
+
+    /**
      * 比赛名称
      */
     @Column("competition_name")

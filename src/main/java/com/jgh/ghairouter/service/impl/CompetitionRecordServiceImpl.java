@@ -5,10 +5,12 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
+import com.jgh.ghairouter.mapper.ActivityTypeMapper;
 import com.jgh.ghairouter.mapper.CategoryMapper;
 import com.jgh.ghairouter.mapper.CompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
+import com.jgh.ghairouter.model.entity.ActivityType;
 import com.jgh.ghairouter.model.entity.Category;
 import com.jgh.ghairouter.model.entity.CompetitionRecord;
 import com.jgh.ghairouter.model.entity.User;
@@ -47,18 +49,33 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     @Resource
     private CategoryMapper categoryMapper;
 
+    @Resource
+    private ActivityTypeMapper activityTypeMapper;
+
 
     @Override
-    public Long addRecord(Long userId, Long categoryId, String awardLevel,
-                          String firstAuthor, List<String> authors, MultipartFile file) {
+    public Long addRecord(Long userId, Long categoryId, Long activityTypeId,
+                          String awardLevel, String firstAuthor,
+                          List<String> authors, MultipartFile file) {
         // 校验分类是否存在
         Category category = categoryMapper.selectOneById(categoryId);
         if (category == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "比赛分类不存在");
         }
 
-        // 比赛名称 = 所选子分类名称
-        String competitionName = category.getName();
+        // 校验活动类型是否存在
+        ActivityType activityType = activityTypeMapper.selectOneById(activityTypeId);
+        if (activityType == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不存在");
+        }
+
+        // 校验活动类型是否属于所选分类
+        if (!activityType.getCategoryId().equals(categoryId)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不属于所选分类");
+        }
+
+        // 比赛名称 = 所选活动类型名称
+        String competitionName = activityType.getName();
 
         // 读取文件并转为 base64
         String base64 = null;
@@ -72,7 +89,8 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         // 创建记录
         CompetitionRecord record = new CompetitionRecord();
         record.setUserId(userId);
-        record.setCategoryId(category.getParentId());
+        record.setCategoryId(categoryId);
+        record.setActivityTypeId(activityTypeId);
         record.setCompetitionName(competitionName);
         record.setAwardLevel(awardLevel);
         record.setFirstAuthor(firstAuthor);
@@ -112,6 +130,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         Long id = queryRequest.getId();
         Long userId = queryRequest.getUserId();
         Long categoryId = queryRequest.getCategoryId();
+        Long activityTypeId = queryRequest.getActivityTypeId();
         String competitionName = queryRequest.getCompetitionName();
         String autoReviewStatus = queryRequest.getAutoReviewStatus();
         String adminReviewStatus = queryRequest.getAdminReviewStatus();
@@ -122,6 +141,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                 .eq("id", id)
                 .eq("user_id", userId)
                 .eq("category_id", categoryId)
+                .eq("activity_type_id", activityTypeId)
                 .eq("auto_review_status", autoReviewStatus)
                 .eq("admin_review_status", adminReviewStatus)
                 .like("competition_name", competitionName);
@@ -174,6 +194,14 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             Category category = categoryMapper.selectOneById(record.getCategoryId());
             if (category != null) {
                 vo.setCategoryName(category.getName());
+            }
+        }
+
+        // 填充活动类型名
+        if (record.getActivityTypeId() != null) {
+            ActivityType activityType = activityTypeMapper.selectOneById(record.getActivityTypeId());
+            if (activityType != null) {
+                vo.setActivityTypeName(activityType.getName());
             }
         }
 

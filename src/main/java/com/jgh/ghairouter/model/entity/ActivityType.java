@@ -15,14 +15,14 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 比赛分类 实体类（仅顶层分类：服务类、个人业务类）
+ * 活动类型 实体类（具体比赛/活动类型，隶属于某个分类）
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("category")
-public class Category implements Serializable {
+@Table("activity_type")
+public class ActivityType implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -34,16 +34,22 @@ public class Category implements Serializable {
     private Long id;
 
     /**
-     * 分类名称
+     * 活动类型名称
      */
     @Column("name")
     private String name;
 
     /**
-     * 分类描述
+     * 活动类型描述
      */
     @Column("description")
     private String description;
+
+    /**
+     * 所属分类ID
+     */
+    @Column("category_id")
+    private Long categoryId;
 
     /**
      * 排序

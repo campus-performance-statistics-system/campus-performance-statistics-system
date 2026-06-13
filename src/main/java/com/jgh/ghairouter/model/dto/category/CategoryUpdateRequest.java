@@ -30,11 +30,6 @@ public class CategoryUpdateRequest implements Serializable {
     private String description;
 
     /**
-     * 父分类ID
-     */
-    private Long parentId;
-
-    /**
      * 排序
      */
     private Integer sortOrder;

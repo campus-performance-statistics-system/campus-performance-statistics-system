@@ -32,6 +32,11 @@ public class CompetitionQueryRequest extends PageRequest {
     private Long categoryId;
 
     /**
+     * 活动类型ID
+     */
+    private Long activityTypeId;
+
+    /**
      * 比赛名称（模糊搜索）
      */
     private String competitionName;

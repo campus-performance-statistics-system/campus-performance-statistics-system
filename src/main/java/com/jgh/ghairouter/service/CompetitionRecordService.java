@@ -18,8 +18,9 @@ public interface CompetitionRecordService extends IService<CompetitionRecord> {
     /**
      * 提交比赛记录（含 multipart 图片文件）
      */
-    Long addRecord(Long userId, Long categoryId, String awardLevel,
-                   String firstAuthor, List<String> authors, MultipartFile file);
+    Long addRecord(Long userId, Long categoryId, Long activityTypeId,
+                   String awardLevel, String firstAuthor,
+                   List<String> authors, MultipartFile file);
 
     /**
      * 根据查询条件构造查询参数

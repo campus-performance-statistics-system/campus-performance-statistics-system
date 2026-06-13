@@ -25,11 +25,6 @@ public class CategoryAddRequest implements Serializable {
     private String description;
 
     /**
-     * 父分类ID，0表示顶层分类
-     */
-    private Long parentId;
-
-    /**
      * 排序
      */
     private Integer sortOrder;

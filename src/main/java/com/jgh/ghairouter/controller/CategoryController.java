@@ -78,23 +78,13 @@ public class CategoryController {
     }
 
     /**
-     * 获取分类树（所有用户可访问，顶层分类含children嵌套）
+     * 获取分类列表（返回扁平列表，所有用户可访问）
      */
     @GetMapping("/list")
-    @Operation(summary = "获取分类树")
+    @Operation(summary = "获取分类列表")
     public BaseResponse<List<Category>> listCategories() {
-        List<Category> tree = categoryService.listTree();
-        return ResultUtils.success(tree);
-    }
-
-    /**
-     * 获取所有子分类（供提交记录时选择）
-     */
-    @GetMapping("/children")
-    @Operation(summary = "获取子分类列表")
-    public BaseResponse<List<Category>> listChildren() {
-        List<Category> children = categoryService.listChildren();
-        return ResultUtils.success(children);
+        List<Category> list = categoryService.listAll();
+        return ResultUtils.success(list);
     }
 
     /**

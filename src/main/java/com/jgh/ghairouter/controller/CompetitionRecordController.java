@@ -45,6 +45,7 @@ public class CompetitionRecordController {
     @Operation(summary = "提交比赛记录")
     public BaseResponse<Long> addRecord(
             @RequestParam("categoryId") Long categoryId,
+            @RequestParam("activityTypeId") Long activityTypeId,
             @RequestParam("awardLevel") String awardLevel,
             @RequestParam("firstAuthor") String firstAuthor,
             @RequestParam(value = "authors", required = false) List<String> authors,
@@ -55,6 +56,7 @@ public class CompetitionRecordController {
         Long recordId = competitionRecordService.addRecord(
                 loginUser.getId(),
                 categoryId,
+                activityTypeId,
                 awardLevel,
                 firstAuthor,
                 authors,
