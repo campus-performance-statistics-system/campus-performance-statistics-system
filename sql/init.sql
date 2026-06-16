@@ -54,13 +54,6 @@ create table if not exists activity_type
     INDEX idx_category_id (category_id)
 ) comment '活动类型' collate = utf8mb4_unicode_ci;
 
-INSERT INTO activity_type (id, name, description, category_id) VALUES
-(1, '学校文体比赛', '学校组织的文艺、体育类比赛活动', 1),
-(2, '志愿服务活动', '校内外志愿服务活动记录', 1),
-(3, '学生社团活动', '学生社团组织的各类活动', 1),
-(4, '大学生创新创业训练计划', '大创项目申报与结题', 2),
-(5, '学科竞赛', '各类学科竞赛（教学创新、信息化、数字创意、课程思政等）', 2),
-(6, '技能证书', '各类专业技能证书考取', 2);
 
 -- ===================== 活动类型-竞赛等级-获奖等级-得分表 =====================
 -- 管理员在新增活动类型时填写：竞赛等级、获奖等级、对应得分

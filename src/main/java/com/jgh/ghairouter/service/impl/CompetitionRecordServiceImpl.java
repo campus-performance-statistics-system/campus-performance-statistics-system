@@ -216,31 +216,34 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     // ==================== 分数计算 ====================
 
     /**
-     * 多人团队分数分配
+     * 多人团队分数分配。
+     * 负责人额外 +2 基础分（参与院级以上比赛：2分/项）。
+     * baseScore 为获奖加分（bonus），按团队比例分配。
      */
-    private void saveTeacherScores(CompetitionRecord record, BigDecimal baseScore,
+    private void saveTeacherScores(CompetitionRecord record, BigDecimal bonus,
                                     int memberNum, Long firstAuthorId,
                                     List<Long> otherAuthorIds) {
         List<TeacherCompetitionScore> scores = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
+        final BigDecimal LEADER_BASE = new BigDecimal("2");
 
         if (memberNum == 1) {
-            // 单人：全部分数
-            TeacherCompetitionScore ts = buildScore(record.getId(), firstAuthorId, baseScore, 1, now);
-            scores.add(ts);
+            // 单人：负责人得2基础分 + 全部加分
+            BigDecimal total = LEADER_BASE.add(bonus);
+            scores.add(buildScore(record.getId(), firstAuthorId, total, 1, now));
         } else if (memberNum == 2) {
-            // 两人：7:3
+            // 两人：负责人 2 + bonus*70%，成员 bonus*30%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    baseScore.multiply(RATIO_2_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
+                    LEADER_BASE.add(bonus.multiply(RATIO_2_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
             if (CollUtil.isNotEmpty(otherAuthorIds) && !otherAuthorIds.get(0).equals(firstAuthorId)) {
                 scores.add(buildScore(record.getId(), otherAuthorIds.get(0),
-                        baseScore.multiply(RATIO_2_MEMBER).setScale(3, RoundingMode.HALF_UP), 0, now));
+                        bonus.multiply(RATIO_2_MEMBER).setScale(3, RoundingMode.HALF_UP), 0, now));
             }
         } else if (memberNum == 3) {
-            // 三人：6:2:2
+            // 三人：负责人 2 + bonus*60%，成员 bonus*20%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    baseScore.multiply(RATIO_3_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
-            BigDecimal perMember = baseScore.multiply(RATIO_3_MEMBER).setScale(3, RoundingMode.HALF_UP);
+                    LEADER_BASE.add(bonus.multiply(RATIO_3_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
+            BigDecimal perMember = bonus.multiply(RATIO_3_MEMBER).setScale(3, RoundingMode.HALF_UP);
             if (CollUtil.isNotEmpty(otherAuthorIds)) {
                 for (Long otherId : otherAuthorIds) {
                     if (!otherId.equals(firstAuthorId)) {
@@ -249,13 +252,13 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                 }
             }
         } else {
-            // 四人及以上：负责人50%，其余平分50%
+            // 四人及以上：负责人 2 + bonus*50%，其余平分 bonus*50%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    baseScore.multiply(RATIO_N_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
+                    LEADER_BASE.add(bonus.multiply(RATIO_N_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
             int otherCount = memberNum - 1;
             if (otherCount > 0 && CollUtil.isNotEmpty(otherAuthorIds)) {
-                BigDecimal restTotal = baseScore.multiply(RATIO_N_REST);
-                BigDecimal perMember = restTotal.divide(BigDecimal.valueOf(otherCount), 3, RoundingMode.HALF_UP);
+                BigDecimal restBonus = bonus.multiply(RATIO_N_REST);
+                BigDecimal perMember = restBonus.divide(BigDecimal.valueOf(otherCount), 3, RoundingMode.HALF_UP);
                 for (Long otherId : otherAuthorIds) {
                     if (!otherId.equals(firstAuthorId)) {
                         scores.add(buildScore(record.getId(), otherId, perMember, 0, now));
@@ -275,7 +278,8 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     private void saveNoAwardScores(CompetitionRecord record, BigDecimal baseScore,
                                     Long firstAuthorId, List<Long> otherAuthorIds) {
         LocalDateTime now = LocalDateTime.now();
-        teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, baseScore, 1, now));
+        // 未获奖：只有负责人得2分基础分
+        teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, new BigDecimal("2"), 1, now));
         if (CollUtil.isNotEmpty(otherAuthorIds)) {
             for (Long otherId : otherAuthorIds) {
                 if (!otherId.equals(firstAuthorId)) {
