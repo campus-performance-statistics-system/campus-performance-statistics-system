@@ -397,8 +397,8 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                 .eq("auto_review_status", req.getAutoReviewStatus())
                 .eq("admin_review_status", req.getAdminReviewStatus())
                 .like("competition_name", req.getCompetitionName())
-                .where("(user_id = {0} OR first_author_id = {0} OR other_author_ids LIKE {1})",
-                        userId, "%" + userId + "%");
+                .where("(user_id = ? OR first_author_id = ? OR other_author_ids LIKE ?)",
+                        userId, userId, "%" + userId + "%");
         wrapper.orderBy("create_time", false);
 
         Page<CompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
@@ -454,6 +454,34 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
         if (!this.updateById(record))
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "审核失败");
+
+        // 审核通过后计算并保存个人得分
+        if (statusEnum == ReviewStatusEnum.PASSED) {
+            // 先清除旧得分记录
+            teacherScoreMapper.deleteByQuery(
+                    QueryWrapper.create().eq("record_id", recordId));
+
+            // 解析团队成员
+            List<Long> otherAuthorIds = new ArrayList<>();
+            if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
+                for (String idStr : record.getOtherAuthorIds().split(",")) {
+                    if (StrUtil.isNotBlank(idStr.trim())) {
+                        otherAuthorIds.add(Long.valueOf(idStr.trim()));
+                    }
+                }
+            }
+
+            int memberNum = record.getTeamMemberNum() != null && record.getTeamMemberNum() > 0
+                    ? record.getTeamMemberNum() : 1;
+            BigDecimal score = record.getBaseScore() != null
+                    ? record.getBaseScore() : BigDecimal.ZERO;
+
+            if ("未获奖".equals(record.getGradeName())) {
+                saveNoAwardScores(record, score, record.getFirstAuthorId(), otherAuthorIds);
+            } else {
+                saveTeacherScores(record, score, memberNum, record.getFirstAuthorId(), otherAuthorIds);
+            }
+        }
     }
 
     // ==================== 导出Excel ====================
