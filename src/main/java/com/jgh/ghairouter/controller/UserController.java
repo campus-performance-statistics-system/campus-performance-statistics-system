@@ -317,6 +317,19 @@ public class UserController {
      *
      * @param userQueryRequest 查询请求参数
      */
+    /**
+     * 获取可参赛用户列表（不含管理员），供提交比赛记录时选择团队成员
+     */
+    @GetMapping("/list/members")
+    @Operation(summary = "获取参赛成员列表")
+    public BaseResponse<List<UserVO>> listMembers() {
+        List<User> users = userService.list(
+                QueryWrapper.create()
+                        .eq("userRole", UserRoleEnum.USER.getValue())
+                        .orderBy("id", true));
+        return ResultUtils.success(userService.getUserVOList(users));
+    }
+
     @PostMapping("/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest) {
