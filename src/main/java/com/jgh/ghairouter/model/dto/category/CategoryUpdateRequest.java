@@ -29,8 +29,4 @@ public class CategoryUpdateRequest implements Serializable {
      */
     private String description;
 
-    /**
-     * 排序
-     */
-    private Integer sortOrder;
 }

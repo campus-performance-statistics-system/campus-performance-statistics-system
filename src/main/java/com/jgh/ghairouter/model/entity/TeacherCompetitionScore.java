@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("teacher_competition_score")
+@Table("user_competition_score")
 public class TeacherCompetitionScore implements Serializable {
 
     @Serial
@@ -34,7 +34,7 @@ public class TeacherCompetitionScore implements Serializable {
     @Column("record_id")
     private Long recordId;
 
-    @Column("teacher_user_id")
+    @Column("user_id")
     private Long teacherUserId;
 
     @Column("personal_score")

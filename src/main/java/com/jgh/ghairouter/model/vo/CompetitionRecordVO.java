@@ -6,6 +6,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 比赛记录 VO（含关联信息）
@@ -23,14 +24,12 @@ public class CompetitionRecordVO implements Serializable {
     private String categoryName;
     private Long activityTypeId;
     private String activityTypeName;
-    private Long rankGradeScoreId;
-    private String competitionRankName;
-    private String awardGradeName;
     private String competitionName;
     private String sponsorUnit;
+    private String competitionRank;
+    private String gradeName;
+    private BigDecimal baseScore;
     private Integer teamMemberNum;
-    private Long distributeRuleId;
-    private String distributeRuleDesc;
     private Long firstAuthorId;
     private String firstAuthorName;
     private String otherAuthorIds;
@@ -45,4 +44,10 @@ public class CompetitionRecordVO implements Serializable {
     private LocalDateTime adminReviewTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    /** 团队成员得分明细 */
+    private List<TeacherScoreVO> teacherScores;
+
+    /** 当前用户在该记录中的得分 */
+    private BigDecimal myScore;
 }

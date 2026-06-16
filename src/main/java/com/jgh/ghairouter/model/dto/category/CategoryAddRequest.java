@@ -24,8 +24,4 @@ public class CategoryAddRequest implements Serializable {
      */
     private String description;
 
-    /**
-     * 排序
-     */
-    private Integer sortOrder;
 }

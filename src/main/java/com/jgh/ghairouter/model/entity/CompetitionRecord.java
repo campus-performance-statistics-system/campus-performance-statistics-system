@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -42,10 +43,6 @@ public class CompetitionRecord implements Serializable {
     @Column("activity_type_id")
     private Long activityTypeId;
 
-    /** 竞赛等级+获奖等级计分规则ID */
-    @Column("rank_grade_score_id")
-    private Long rankGradeScoreId;
-
     /** 比赛全称 */
     @Column("competition_name")
     private String competitionName;
@@ -54,13 +51,21 @@ public class CompetitionRecord implements Serializable {
     @Column("sponsor_unit")
     private String sponsorUnit;
 
+    /** 获奖级别：校级/区级/国家级 */
+    @Column("competition_rank")
+    private String competitionRank;
+
+    /** 等级：一等奖/二等奖/三等奖/优秀奖/未获奖 */
+    @Column("grade_name")
+    private String gradeName;
+
+    /** 基础总分 */
+    @Column("base_score")
+    private BigDecimal baseScore;
+
     /** 参赛总人数 */
     @Column("team_member_num")
     private Integer teamMemberNum;
-
-    /** 分数分配规则ID */
-    @Column("distribute_rule_id")
-    private Long distributeRuleId;
 
     /** 第一负责人用户ID */
     @Column("first_author_id")

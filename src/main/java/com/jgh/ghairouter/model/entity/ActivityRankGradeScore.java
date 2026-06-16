@@ -16,14 +16,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 团队分数分配规则
+ * 活动类型-竞赛等级-获奖等级得分规则
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("score_distribute_rule")
-public class ScoreDistributeRule implements Serializable {
+@Table("activity_rank_grade_score")
+public class ActivityRankGradeScore implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -31,17 +31,17 @@ public class ScoreDistributeRule implements Serializable {
     @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
     private Long id;
 
-    @Column("member_count")
-    private Integer memberCount;
+    @Column("activity_type_id")
+    private Long activityTypeId;
 
-    @Column("rule_desc")
-    private String ruleDesc;
+    @Column("competition_rank")
+    private String competitionRank;
 
-    @Column("leader_ratio")
-    private BigDecimal leaderRatio;
+    @Column("grade_name")
+    private String gradeName;
 
-    @Column("member_ratio")
-    private BigDecimal memberRatio;
+    @Column("base_score")
+    private BigDecimal baseScore;
 
     @Column("create_time")
     private LocalDateTime createTime;

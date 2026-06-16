@@ -5,7 +5,6 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import java.io.Serial;
@@ -54,18 +53,6 @@ public class User implements Serializable {
      */
     @Column("userName")
     private String userName;
-
-    /**
-     * 用户头像
-     */
-    @Column("userAvatar")
-    private String userAvatar;
-
-    /**
-     * 用户简介
-     */
-    @Column("userProfile")
-    private String userProfile;
 
     /**
      * 用户角色：user/admin

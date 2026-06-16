@@ -21,11 +21,11 @@ public class ActivityTypeServiceImpl
     public List<ActivityType> listByCategoryId(Long categoryId) {
         return this.list(QueryWrapper.create()
                 .eq("category_id", categoryId)
-                .orderBy("sort_order", true));
+                .orderBy("id", true));
     }
 
     @Override
     public List<ActivityType> listAll() {
-        return this.list(QueryWrapper.create().orderBy("sort_order", true));
+        return this.list(QueryWrapper.create().orderBy("id", true));
     }
 }

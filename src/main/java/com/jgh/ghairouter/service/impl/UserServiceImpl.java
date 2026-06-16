@@ -167,7 +167,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         Long id = userQueryRequest.getId();
         String userAccount = userQueryRequest.getUserAccount();
         String userName = userQueryRequest.getUserName();
-        String userProfile = userQueryRequest.getUserProfile();
         String userRole = userQueryRequest.getUserRole();
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
@@ -176,7 +175,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .eq("userRole", userRole) // and userRole = ${userRole}
                 .like("userAccount", userAccount)
                 .like("userName", userName)
-                .like("userProfile", userProfile)
                 .orderBy(sortField, "ascend".equals(sortOrder));
     }
 

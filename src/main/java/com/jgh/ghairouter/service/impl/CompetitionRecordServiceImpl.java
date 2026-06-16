@@ -10,6 +10,7 @@ import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.*;
 import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
 import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
+import com.jgh.ghairouter.model.vo.TeacherScoreVO;
 import com.jgh.ghairouter.service.AiReviewService;
 import com.jgh.ghairouter.service.CompetitionRecordService;
 import com.mybatisflex.core.paginate.Page;
@@ -27,6 +28,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 比赛记录服务实现。
+ * 分数分配规则（硬编码）：
+ * - 单人：100%
+ * - 两人：负责人70%，另一人30%
+ * - 三人：负责人60%，其余两人各20%
+ * - 四人及以上：负责人50%，其余人平分50%
+ * - 未获奖：只有负责人得分
+ */
 @Slf4j
 @Service
 public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordMapper, CompetitionRecord>
@@ -41,48 +51,60 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     @Resource
     private ActivityTypeMapper activityTypeMapper;
     @Resource
-    private CompetitionRankMapper competitionRankMapper;
-    @Resource
-    private RankGradeScoreMapper rankGradeScoreMapper;
-    @Resource
-    private ScoreDistributeRuleMapper distributeRuleMapper;
-    @Resource
     private TeacherCompetitionScoreMapper teacherScoreMapper;
+
+    // ==================== 分数分配规则（硬编码） ====================
+
+    /** 两人：负责人70%，成员30% */
+    private static final BigDecimal RATIO_2_LEADER = new BigDecimal("0.70");
+    private static final BigDecimal RATIO_2_MEMBER = new BigDecimal("0.30");
+
+    /** 三人：负责人60%，成员各20% */
+    private static final BigDecimal RATIO_3_LEADER = new BigDecimal("0.60");
+    private static final BigDecimal RATIO_3_MEMBER = new BigDecimal("0.20");
+
+    /** 四人及以上：负责人50%，其余平分50% */
+    private static final BigDecimal RATIO_N_LEADER = new BigDecimal("0.50");
+    private static final BigDecimal RATIO_N_REST = new BigDecimal("0.50");
+
+    /**
+     * 获取分配规则描述
+     */
+    public static String getDistributeRuleDesc(int memberCount) {
+        return switch (memberCount) {
+            case 2 -> "两人完成，负责人70%，另一人30%";
+            case 3 -> "三人完成，负责人60%，其余两人各20%";
+            default -> "四人及以上，主持人50%，剩余所有人平分50%";
+        };
+    }
+
+    // ==================== 用户提交比赛记录 ====================
 
     @Override
     public Long addRecord(Long userId, Long categoryId, Long activityTypeId,
-                          Long rankGradeScoreId, String competitionName, String sponsorUnit,
+                          String competitionName, String sponsorUnit,
+                          String competitionRank, String gradeName, BigDecimal baseScore,
                           Integer teamMemberNum, Long firstAuthorId,
                           List<Long> otherAuthorIds, MultipartFile file) {
         // 校验分类
-        Category category = categoryMapper.selectOneById(categoryId);
-        if (category == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "比赛分类不存在");
-
+        if (categoryId != null) {
+            Category category = categoryMapper.selectOneById(categoryId);
+            if (category == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "比赛分类不存在");
+        }
         // 校验活动类型
-        ActivityType activityType = activityTypeMapper.selectOneById(activityTypeId);
-        if (activityType == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不存在");
-        if (!activityType.getCategoryId().equals(categoryId))
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不属于所选分类");
-
-        // 校验计分规则
-        RankGradeScore scoreRule = rankGradeScoreMapper.selectOneById(rankGradeScoreId);
-        if (scoreRule == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "计分规则不存在");
+        if (activityTypeId != null) {
+            ActivityType activityType = activityTypeMapper.selectOneById(activityTypeId);
+            if (activityType == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不存在");
+        }
 
         // 团队人数
         int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
 
-        // 查询分配规则（仅多人团队）
-        ScoreDistributeRule distributeRule = null;
-        if (memberNum > 1) {
-            distributeRule = distributeRuleMapper.selectOneByQuery(
-                    QueryWrapper.create().eq("member_count",
-                            memberNum >= 4 ? 4 : memberNum));
-        }
-
         // 读取文件 base64
         String base64;
         try {
-            base64 = Base64.getEncoder().encodeToString(file.getBytes());
+            base64 = file != null && !file.isEmpty()
+                    ? Base64.getEncoder().encodeToString(file.getBytes()) : null;
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "读取文件失败");
         }
@@ -92,11 +114,12 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         record.setUserId(userId);
         record.setCategoryId(categoryId);
         record.setActivityTypeId(activityTypeId);
-        record.setRankGradeScoreId(rankGradeScoreId);
         record.setCompetitionName(competitionName);
         record.setSponsorUnit(sponsorUnit);
+        record.setCompetitionRank(competitionRank);
+        record.setGradeName(gradeName);
+        record.setBaseScore(baseScore);
         record.setTeamMemberNum(memberNum);
-        record.setDistributeRuleId(distributeRule != null ? distributeRule.getId() : null);
         record.setFirstAuthorId(firstAuthorId);
         if (CollUtil.isNotEmpty(otherAuthorIds)) {
             record.setOtherAuthorIds(otherAuthorIds.stream()
@@ -109,69 +132,125 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         boolean saved = this.save(record);
         if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "提交失败");
 
-        // 计算并保存个人得分明细
-        saveTeacherScores(record, scoreRule.getBaseScore(), distributeRule, firstAuthorId, otherAuthorIds);
-
         // 触发AI审核
-        String mimeType = file.getContentType();
-        if (StrUtil.isBlank(mimeType)) mimeType = "image/png";
-        try {
-            aiReviewService.autoReview(record.getId(), competitionName, base64, mimeType);
-        } catch (Exception e) {
-            log.error("AI审核触发失败", e);
+        if (file != null && !file.isEmpty()) {
+            String mimeType = file.getContentType();
+            if (StrUtil.isBlank(mimeType)) mimeType = "image/png";
+            try {
+                aiReviewService.autoReview(record.getId(), competitionName, base64, mimeType);
+            } catch (Exception e) {
+                log.error("AI审核触发失败", e);
+            }
         }
         return record.getId();
     }
 
+    // ==================== 管理员添加比赛记录 ====================
+
+    @Override
+    public Long adminAddRecord(Long adminId, String competitionName, String sponsorUnit,
+                                Long rankId, String gradeName, BigDecimal baseScore,
+                                Integer teamMemberNum, Long firstAuthorId,
+                                List<Long> otherAuthorIds, MultipartFile file) {
+        int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
+
+        // 读取文件base64（可选）
+        String base64 = null;
+        if (file != null && !file.isEmpty()) {
+            try {
+                base64 = Base64.getEncoder().encodeToString(file.getBytes());
+            } catch (IOException e) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "读取文件失败");
+            }
+        }
+
+        // 竞赛等级映射
+        String competitionRank;
+        if (rankId == 1) competitionRank = "国家级";
+        else if (rankId == 2) competitionRank = "区级";
+        else if (rankId == 3) competitionRank = "校级";
+        else competitionRank = "校级";
+
+        // 构建记录
+        CompetitionRecord record = new CompetitionRecord();
+        record.setUserId(adminId);
+        record.setCompetitionName(competitionName);
+        record.setSponsorUnit(sponsorUnit);
+        record.setCompetitionRank(competitionRank);
+        record.setGradeName(gradeName);
+        record.setBaseScore(baseScore);
+        record.setTeamMemberNum(memberNum);
+        record.setFirstAuthorId(firstAuthorId);
+        if (CollUtil.isNotEmpty(otherAuthorIds)) {
+            record.setOtherAuthorIds(otherAuthorIds.stream()
+                    .map(String::valueOf).collect(Collectors.joining(",")));
+        }
+        record.setProofImageData(base64);
+        record.setAutoReviewStatus(ReviewStatusEnum.PASSED.getValue());
+        record.setAdminReviewStatus(ReviewStatusEnum.PASSED.getValue());
+        record.setAdminId(adminId);
+        record.setAdminReviewTime(LocalDateTime.now());
+        record.setAdminReviewComment("管理员直接录入");
+
+        boolean saved = this.save(record);
+        if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "添加失败");
+
+        // 计算并保存个人得分明细
+        if ("未获奖".equals(gradeName)) {
+            saveNoAwardScores(record, baseScore, firstAuthorId, otherAuthorIds);
+        } else {
+            saveTeacherScores(record, baseScore, memberNum, firstAuthorId, otherAuthorIds);
+        }
+
+        return record.getId();
+    }
+
+    // ==================== 分数计算 ====================
+
+    /**
+     * 多人团队分数分配
+     */
     private void saveTeacherScores(CompetitionRecord record, BigDecimal baseScore,
-                                    ScoreDistributeRule distributeRule,
-                                    Long firstAuthorId, List<Long> otherAuthorIds) {
+                                    int memberNum, Long firstAuthorId,
+                                    List<Long> otherAuthorIds) {
         List<TeacherCompetitionScore> scores = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
-        int memberNum = record.getTeamMemberNum();
 
         if (memberNum == 1) {
-            TeacherCompetitionScore ts = new TeacherCompetitionScore();
-            ts.setRecordId(record.getId());
-            ts.setTeacherUserId(firstAuthorId);
-            ts.setPersonalScore(baseScore);
-            ts.setIsLeader(1);
-            ts.setCreateTime(now);
-            ts.setUpdateTime(now);
+            // 单人：全部分数
+            TeacherCompetitionScore ts = buildScore(record.getId(), firstAuthorId, baseScore, 1, now);
             scores.add(ts);
-        } else if (distributeRule != null) {
-            BigDecimal leaderRatio = distributeRule.getLeaderRatio();
-            BigDecimal memberRatio = distributeRule.getMemberRatio();
-
-            BigDecimal leaderScore = baseScore.multiply(leaderRatio).setScale(3, RoundingMode.HALF_UP);
-
-            TeacherCompetitionScore leaderTs = new TeacherCompetitionScore();
-            leaderTs.setRecordId(record.getId());
-            leaderTs.setTeacherUserId(firstAuthorId);
-            leaderTs.setPersonalScore(leaderScore);
-            leaderTs.setIsLeader(1);
-            leaderTs.setCreateTime(now);
-            leaderTs.setUpdateTime(now);
-            scores.add(leaderTs);
-
+        } else if (memberNum == 2) {
+            // 两人：7:3
+            scores.add(buildScore(record.getId(), firstAuthorId,
+                    baseScore.multiply(RATIO_2_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
+            if (CollUtil.isNotEmpty(otherAuthorIds) && !otherAuthorIds.get(0).equals(firstAuthorId)) {
+                scores.add(buildScore(record.getId(), otherAuthorIds.get(0),
+                        baseScore.multiply(RATIO_2_MEMBER).setScale(3, RoundingMode.HALF_UP), 0, now));
+            }
+        } else if (memberNum == 3) {
+            // 三人：6:2:2
+            scores.add(buildScore(record.getId(), firstAuthorId,
+                    baseScore.multiply(RATIO_3_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
+            BigDecimal perMember = baseScore.multiply(RATIO_3_MEMBER).setScale(3, RoundingMode.HALF_UP);
             if (CollUtil.isNotEmpty(otherAuthorIds)) {
-                BigDecimal perMemberScore;
-                if (memberNum >= 4) {
-                    BigDecimal remainingTotal = baseScore.multiply(new BigDecimal("0.50"));
-                    perMemberScore = remainingTotal.divide(BigDecimal.valueOf(memberNum - 1), 3, RoundingMode.HALF_UP);
-                } else {
-                    perMemberScore = baseScore.multiply(memberRatio).setScale(3, RoundingMode.HALF_UP);
-                }
                 for (Long otherId : otherAuthorIds) {
                     if (!otherId.equals(firstAuthorId)) {
-                        TeacherCompetitionScore memberTs = new TeacherCompetitionScore();
-                        memberTs.setRecordId(record.getId());
-                        memberTs.setTeacherUserId(otherId);
-                        memberTs.setPersonalScore(perMemberScore);
-                        memberTs.setIsLeader(0);
-                        memberTs.setCreateTime(now);
-                        memberTs.setUpdateTime(now);
-                        scores.add(memberTs);
+                        scores.add(buildScore(record.getId(), otherId, perMember, 0, now));
+                    }
+                }
+            }
+        } else {
+            // 四人及以上：负责人50%，其余平分50%
+            scores.add(buildScore(record.getId(), firstAuthorId,
+                    baseScore.multiply(RATIO_N_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
+            int otherCount = memberNum - 1;
+            if (otherCount > 0 && CollUtil.isNotEmpty(otherAuthorIds)) {
+                BigDecimal restTotal = baseScore.multiply(RATIO_N_REST);
+                BigDecimal perMember = restTotal.divide(BigDecimal.valueOf(otherCount), 3, RoundingMode.HALF_UP);
+                for (Long otherId : otherAuthorIds) {
+                    if (!otherId.equals(firstAuthorId)) {
+                        scores.add(buildScore(record.getId(), otherId, perMember, 0, now));
                     }
                 }
             }
@@ -181,6 +260,36 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             teacherScoreMapper.insert(ts);
         }
     }
+
+    /**
+     * 未获奖团队：只有负责人得分
+     */
+    private void saveNoAwardScores(CompetitionRecord record, BigDecimal baseScore,
+                                    Long firstAuthorId, List<Long> otherAuthorIds) {
+        LocalDateTime now = LocalDateTime.now();
+        teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, baseScore, 1, now));
+        if (CollUtil.isNotEmpty(otherAuthorIds)) {
+            for (Long otherId : otherAuthorIds) {
+                if (!otherId.equals(firstAuthorId)) {
+                    teacherScoreMapper.insert(buildScore(record.getId(), otherId, BigDecimal.ZERO, 0, now));
+                }
+            }
+        }
+    }
+
+    private TeacherCompetitionScore buildScore(Long recordId, Long userId,
+                                                BigDecimal score, int isLeader, LocalDateTime now) {
+        TeacherCompetitionScore ts = new TeacherCompetitionScore();
+        ts.setRecordId(recordId);
+        ts.setTeacherUserId(userId);
+        ts.setPersonalScore(score);
+        ts.setIsLeader(isLeader);
+        ts.setCreateTime(now);
+        ts.setUpdateTime(now);
+        return ts;
+    }
+
+    // ==================== 查询 ====================
 
     @Override
     public QueryWrapper getQueryWrapper(CompetitionQueryRequest req) {
@@ -218,21 +327,6 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             ActivityType at = activityTypeMapper.selectOneById(record.getActivityTypeId());
             if (at != null) vo.setActivityTypeName(at.getName());
         }
-        // 从计分规则解析竞赛等级名和获奖等级名
-        if (record.getRankGradeScoreId() != null) {
-            RankGradeScore score = rankGradeScoreMapper.selectOneById(record.getRankGradeScoreId());
-            if (score != null) {
-                vo.setAwardGradeName(score.getGradeName());
-                if (score.getRankId() != null) {
-                    CompetitionRank rank = competitionRankMapper.selectOneById(score.getRankId());
-                    if (rank != null) vo.setCompetitionRankName(rank.getRankName());
-                }
-            }
-        }
-        if (record.getDistributeRuleId() != null) {
-            ScoreDistributeRule rule = distributeRuleMapper.selectOneById(record.getDistributeRuleId());
-            if (rule != null) vo.setDistributeRuleDesc(rule.getRuleDesc());
-        }
         if (record.getFirstAuthorId() != null) {
             User leader = userMapper.selectOneById(record.getFirstAuthorId());
             if (leader != null) vo.setFirstAuthorName(leader.getUserName());
@@ -250,6 +344,23 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             User admin = userMapper.selectOneById(record.getAdminId());
             if (admin != null) vo.setAdminName(admin.getUserName());
         }
+        // 查询得分明细
+        List<TeacherCompetitionScore> scoreList = teacherScoreMapper.selectListByQuery(
+                QueryWrapper.create().eq("record_id", record.getId()));
+        if (CollUtil.isNotEmpty(scoreList)) {
+            List<TeacherScoreVO> scoreVOs = scoreList.stream()
+                    .map(ts -> {
+                        User u = userMapper.selectOneById(ts.getTeacherUserId());
+                        return TeacherScoreVO.builder()
+                                .userId(ts.getTeacherUserId())
+                                .userName(u != null ? u.getUserName() : String.valueOf(ts.getTeacherUserId()))
+                                .personalScore(ts.getPersonalScore())
+                                .isLeader(ts.getIsLeader())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+            vo.setTeacherScores(scoreVOs);
+        }
         return vo;
     }
 
@@ -265,6 +376,52 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         voPage.setRecords(voList);
         return voPage;
     }
+
+    @Override
+    public Page<CompetitionRecordVO> pageMyRelatedRecords(Long userId, CompetitionQueryRequest req) {
+        long pageNum = req.getPageNum();
+        long pageSize = req.getPageSize();
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq("id", req.getId())
+                .eq("category_id", req.getCategoryId())
+                .eq("activity_type_id", req.getActivityTypeId())
+                .eq("auto_review_status", req.getAutoReviewStatus())
+                .eq("admin_review_status", req.getAdminReviewStatus())
+                .like("competition_name", req.getCompetitionName())
+                .where("(user_id = {0} OR first_author_id = {0} OR other_author_ids LIKE {1})",
+                        userId, "%" + userId + "%");
+        wrapper.orderBy("create_time", false);
+
+        Page<CompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+        List<CompetitionRecordVO> voList = recordPage.getRecords().stream()
+                .map(record -> {
+                    CompetitionRecordVO vo = getRecordVO(record);
+                    if (vo.getTeacherScores() != null) {
+                        vo.getTeacherScores().stream()
+                                .filter(ts -> userId.equals(ts.getUserId()))
+                                .findFirst()
+                                .ifPresent(ts -> vo.setMyScore(ts.getPersonalScore()));
+                    }
+                    return vo;
+                })
+                .collect(Collectors.toList());
+        Page<CompetitionRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
+        voPage.setRecords(voList);
+        return voPage;
+    }
+
+    @Override
+    public BigDecimal getMyTotalScore(Long userId) {
+        List<TeacherCompetitionScore> scores = teacherScoreMapper.selectListByQuery(
+                QueryWrapper.create().eq("user_id", userId));
+        if (CollUtil.isEmpty(scores)) return BigDecimal.ZERO;
+        return scores.stream()
+                .map(TeacherCompetitionScore::getPersonalScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // ==================== 审核 ====================
 
     @Override
     public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
@@ -289,5 +446,65 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
         if (!this.updateById(record))
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "审核失败");
+    }
+
+    // ==================== 导出Excel ====================
+
+    @Override
+    public byte[] exportRecordsToExcel() {
+        List<CompetitionRecord> records = this.list(QueryWrapper.create().orderBy("create_time", true));
+
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("比赛得分详情");
+
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            String[] headers = {"序号", "竞赛名称", "颁奖单位", "获奖级别", "等级", "获奖教师及得分"};
+            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            for (int i = 0; i < headers.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIdx = 1;
+            int seq = 1;
+            for (CompetitionRecord record : records) {
+                CompetitionRecordVO vo = getRecordVO(record);
+                if (vo == null) continue;
+
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(seq++);
+                row.createCell(1).setCellValue(vo.getCompetitionName() != null ? vo.getCompetitionName() : "");
+                row.createCell(2).setCellValue(vo.getSponsorUnit() != null ? vo.getSponsorUnit() : "");
+                row.createCell(3).setCellValue(vo.getCompetitionRank() != null ? vo.getCompetitionRank() : "");
+                row.createCell(4).setCellValue(vo.getGradeName() != null ? vo.getGradeName() : "");
+
+                StringBuilder sb = new StringBuilder();
+                if (vo.getTeacherScores() != null && !vo.getTeacherScores().isEmpty()) {
+                    for (int i = 0; i < vo.getTeacherScores().size(); i++) {
+                        if (i > 0) sb.append("、");
+                        TeacherScoreVO ts = vo.getTeacherScores().get(i);
+                        sb.append(ts.getUserName()).append("（")
+                                .append(ts.getPersonalScore().stripTrailingZeros().toPlainString())
+                                .append("）");
+                    }
+                }
+                row.createCell(5).setCellValue(sb.toString());
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            workbook.write(bos);
+            return bos.toByteArray();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
+        }
     }
 }

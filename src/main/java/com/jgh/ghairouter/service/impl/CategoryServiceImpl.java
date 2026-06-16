@@ -17,6 +17,6 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
 
     @Override
     public List<Category> listAll() {
-        return this.list(QueryWrapper.create().orderBy("sort_order", true));
+        return this.list(QueryWrapper.create().orderBy("id", true));
     }
 }

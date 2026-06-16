@@ -45,15 +45,6 @@ public class Category implements Serializable {
     @Column("description")
     private String description;
 
-    /**
-     * 排序
-     */
-    @Column("sort_order")
-    private Integer sortOrder;
-
-    /**
-     * 创建时间
-     */
     @Column("create_time")
     private LocalDateTime createTime;
 

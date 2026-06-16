@@ -27,63 +27,24 @@ public class ActivityType implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * id
-     */
     @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
     private Long id;
 
-    /**
-     * 活动类型名称
-     */
     @Column("name")
     private String name;
 
-    /**
-     * 活动类型描述
-     */
     @Column("description")
     private String description;
 
-    /**
-     * 所属分类ID
-     */
     @Column("category_id")
     private Long categoryId;
 
-    /**
-     * 关联竞赛等级ID
-     */
-    @Column("competition_rank_id")
-    private Long competitionRankId;
-
-    /**
-     * 颁奖/主办单位
-     */
-    @Column("sponsor_unit")
-    private String sponsorUnit;
-
-    /**
-     * 排序
-     */
-    @Column("sort_order")
-    private Integer sortOrder;
-
-    /**
-     * 创建时间
-     */
     @Column("create_time")
     private LocalDateTime createTime;
 
-    /**
-     * 更新时间
-     */
     @Column("update_time")
     private LocalDateTime updateTime;
 
-    /**
-     * 是否删除
-     */
     @Column(value = "is_delete", isLogicDelete = true)
     private Integer isDelete;
 }

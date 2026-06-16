@@ -19,9 +19,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -37,11 +39,13 @@ public class CompetitionRecordController {
     @PostMapping("/add")
     @Operation(summary = "提交比赛记录")
     public BaseResponse<Long> addRecord(
-            @RequestParam("categoryId") Long categoryId,
-            @RequestParam("activityTypeId") Long activityTypeId,
-            @RequestParam("rankGradeScoreId") Long rankGradeScoreId,
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "activityTypeId", required = false) Long activityTypeId,
             @RequestParam("competitionName") String competitionName,
             @RequestParam(value = "sponsorUnit", required = false) String sponsorUnit,
+            @RequestParam("competitionRank") String competitionRank,
+            @RequestParam("gradeName") String gradeName,
+            @RequestParam(value = "baseScore", required = false) BigDecimal baseScore,
             @RequestParam(value = "teamMemberNum", defaultValue = "1") Integer teamMemberNum,
             @RequestParam("firstAuthorId") Long firstAuthorId,
             @RequestParam(value = "otherAuthorIds", required = false) List<Long> otherAuthorIds,
@@ -50,20 +54,28 @@ public class CompetitionRecordController {
         User loginUser = userService.getLoginUser(httpRequest);
         Long recordId = competitionRecordService.addRecord(
                 loginUser.getId(), categoryId, activityTypeId,
-                rankGradeScoreId, competitionName, sponsorUnit,
+                competitionName, sponsorUnit,
+                competitionRank, gradeName, baseScore,
                 teamMemberNum, firstAuthorId, otherAuthorIds, file);
         return ResultUtils.success(recordId);
     }
 
     @PostMapping("/my/list/page")
-    @Operation(summary = "查看我的比赛记录")
+    @Operation(summary = "查看我的比赛记录（含共享记录）")
     public BaseResponse<Page<CompetitionRecordVO>> listMyRecords(
             @RequestBody CompetitionQueryRequest queryRequest,
             HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(queryRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(httpRequest);
-        queryRequest.setUserId(loginUser.getId());
-        return ResultUtils.success(competitionRecordService.pageRecords(queryRequest));
+        return ResultUtils.success(
+                competitionRecordService.pageMyRelatedRecords(loginUser.getId(), queryRequest));
+    }
+
+    @GetMapping("/my/total-score")
+    @Operation(summary = "获取我的总得分")
+    public BaseResponse<BigDecimal> getMyTotalScore(HttpServletRequest httpRequest) {
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(competitionRecordService.getMyTotalScore(loginUser.getId()));
     }
 
     @GetMapping("/get/{id}")
@@ -99,6 +111,28 @@ public class CompetitionRecordController {
         return ResultUtils.success(competitionRecordService.pageRecords(queryRequest));
     }
 
+    @PostMapping("/admin/add")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "管理员添加比赛记录")
+    public BaseResponse<Long> adminAddRecord(
+            @RequestParam("competitionName") String competitionName,
+            @RequestParam(value = "sponsorUnit", required = false) String sponsorUnit,
+            @RequestParam("rankId") Long rankId,
+            @RequestParam("gradeName") String gradeName,
+            @RequestParam("baseScore") BigDecimal baseScore,
+            @RequestParam(value = "teamMemberNum", defaultValue = "1") Integer teamMemberNum,
+            @RequestParam("firstAuthorId") Long firstAuthorId,
+            @RequestParam(value = "otherAuthorIds", required = false) List<Long> otherAuthorIds,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            HttpServletRequest httpRequest) {
+        User loginUser = userService.getLoginUser(httpRequest);
+        Long recordId = competitionRecordService.adminAddRecord(
+                loginUser.getId(), competitionName, sponsorUnit,
+                rankId, gradeName, baseScore,
+                teamMemberNum, firstAuthorId, otherAuthorIds, file);
+        return ResultUtils.success(recordId);
+    }
+
     @PostMapping("/admin/review")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员审核")
@@ -109,5 +143,22 @@ public class CompetitionRecordController {
         competitionRecordService.adminReview(request.getId(), request.getReviewStatus(),
                 request.getReviewComment(), loginUser.getId());
         return ResultUtils.success(true);
+    }
+
+    @GetMapping("/admin/export")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "导出比赛得分详情Excel")
+    public void exportRecords(HttpServletResponse response) {
+        byte[] excelData = competitionRecordService.exportRecordsToExcel();
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition",
+                "attachment; filename=competition_scores.xlsx");
+        response.setContentLength(excelData.length);
+        try {
+            response.getOutputStream().write(excelData);
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "导出失败: " + e.getMessage());
+        }
     }
 }
