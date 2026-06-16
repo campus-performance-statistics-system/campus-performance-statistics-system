@@ -115,7 +115,15 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         record.setCategoryId(categoryId);
         record.setActivityTypeId(activityTypeId);
         record.setCompetitionName(competitionName);
-        record.setSponsorUnit(sponsorUnit);
+        // 颁奖单位：优先使用传入值，为空则从活动类型自动获取
+        String unit = sponsorUnit;
+        if (StrUtil.isBlank(unit) && activityTypeId != null) {
+            ActivityType at = activityTypeMapper.selectOneById(activityTypeId);
+            if (at != null && StrUtil.isNotBlank(at.getSponsorUnit())) {
+                unit = at.getSponsorUnit();
+            }
+        }
+        record.setSponsorUnit(unit);
         record.setCompetitionRank(competitionRank);
         record.setGradeName(gradeName);
         record.setBaseScore(baseScore);

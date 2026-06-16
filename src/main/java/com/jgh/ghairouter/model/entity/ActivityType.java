@@ -39,6 +39,9 @@ public class ActivityType implements Serializable {
     @Column("category_id")
     private Long categoryId;
 
+    @Column("sponsor_unit")
+    private String sponsorUnit;
+
     @Column("create_time")
     private LocalDateTime createTime;
 

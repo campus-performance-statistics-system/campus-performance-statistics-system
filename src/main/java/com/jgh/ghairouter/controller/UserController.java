@@ -26,8 +26,11 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -120,60 +123,115 @@ public class UserController {
     @Operation(summary = "批量导入用户")
     public BaseResponse<BatchImportResult> batchImportUsers(
             @RequestParam("file") MultipartFile file) {
-        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "请上传Excel文件");
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "请上传文件");
 
         BatchImportResult result = BatchImportResult.empty();
         final String DEFAULT_PASSWORD = "xky12345678";
         String encryptPassword = userService.getEncryptPassword(DEFAULT_PASSWORD);
 
-        try (InputStream is = file.getInputStream();
-             Workbook workbook = new XSSFWorkbook(is)) {
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件名不能为空");
+        }
 
-            Sheet sheet = workbook.getSheetAt(0);
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // 跳过标题行
-                Row row = sheet.getRow(i);
-                if (row == null) continue;
-
-                try {
-                    // 第一列：工号（账号）
-                    Cell accountCell = row.getCell(0);
-                    if (accountCell == null) continue;
-                    String userAccount = getCellStringValue(accountCell).trim();
-                    if (userAccount.isEmpty()) continue;
-
-                    // 第二列：姓名
-                    Cell nameCell = row.getCell(1);
-                    String userName = nameCell != null ? getCellStringValue(nameCell).trim() : userAccount;
-
-                    // 检查账号是否已存在
-                    long count = userService.count(
-                            QueryWrapper.create().eq("userAccount", userAccount));
-                    if (count > 0) {
-                        result.setSkipCount(result.getSkipCount() + 1);
-                        continue;
-                    }
-
-                    // 创建用户
-                    User user = new User();
-                    user.setUserAccount(userAccount);
-                    user.setUserPassword(encryptPassword);
-                    user.setUserName(userName);
-                    user.setUserRole(UserRoleEnum.USER.getValue());
-                    boolean saved = userService.save(user);
-                    if (saved) {
-                        result.setSuccessCount(result.getSuccessCount() + 1);
-                    } else {
-                        result.getErrors().add("第" + (i + 1) + "行: " + userAccount + " 插入失败");
-                    }
-                } catch (Exception e) {
-                    result.getErrors().add("第" + (i + 1) + "行处理异常: " + e.getMessage());
-                }
+        try {
+            if (filename.endsWith(".csv")) {
+                importFromCsv(file.getInputStream(), encryptPassword, result);
+            } else {
+                importFromExcel(file.getInputStream(), encryptPassword, result);
             }
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel文件解析失败: " + e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件解析失败: " + e.getMessage());
         }
 
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 从Excel (.xlsx) 导入
+     */
+    private void importFromExcel(InputStream is, String encryptPassword,
+                                  BatchImportResult result) throws Exception {
+        try (Workbook workbook = new XSSFWorkbook(is)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                Cell accountCell = row.getCell(0);
+                if (accountCell == null) continue;
+                String userAccount = getCellStringValue(accountCell).trim();
+                if (userAccount.isEmpty()) continue;
+
+                Cell nameCell = row.getCell(1);
+                String userName = nameCell != null ? getCellStringValue(nameCell).trim() : userAccount;
+
+                createUserIfNotExists(userAccount, userName, encryptPassword, result, i + 1);
+            }
+        }
+    }
+
+    /**
+     * 从CSV导入
+     */
+    private void importFromCsv(InputStream is, String encryptPassword,
+                                BatchImportResult result) throws Exception {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            int rowNum = 1;
+            boolean firstRow = true;
+            while ((line = reader.readLine()) != null) {
+                if (firstRow) { firstRow = false; rowNum++; continue; } // 跳过标题行
+                if (line.trim().isEmpty()) { rowNum++; continue; }
+
+                // 处理BOM
+                if (rowNum == 2 && line.charAt(0) == '﻿') {
+                    line = line.substring(1);
+                }
+
+                String[] parts = line.split(",", 2);
+                String userAccount = parts.length > 0 ? parts[0].trim() : "";
+                if (userAccount.isEmpty()) { rowNum++; continue; }
+
+                String userName = parts.length > 1 ? parts[1].trim() : userAccount;
+                // 去掉可能存在的引号
+                userName = userName.replaceAll("^\"|\"$", "");
+
+                createUserIfNotExists(userAccount, userName, encryptPassword, result, rowNum);
+                rowNum++;
+            }
+        }
+    }
+
+    /**
+     * 创建用户（如果账号不存在）
+     */
+    private void createUserIfNotExists(String userAccount, String userName,
+                                        String encryptPassword,
+                                        BatchImportResult result, int rowNum) {
+        try {
+            long count = userService.count(
+                    QueryWrapper.create().eq("userAccount", userAccount));
+            if (count > 0) {
+                result.setSkipCount(result.getSkipCount() + 1);
+                return;
+            }
+            User user = new User();
+            user.setUserAccount(userAccount);
+            user.setUserPassword(encryptPassword);
+            user.setUserName(userName);
+            user.setUserRole(UserRoleEnum.USER.getValue());
+            if (userService.save(user)) {
+                result.setSuccessCount(result.getSuccessCount() + 1);
+            } else {
+                result.getErrors().add("第" + rowNum + "行: " + userAccount + " 插入失败");
+            }
+        } catch (Exception e) {
+            result.getErrors().add("第" + rowNum + "行处理异常: " + e.getMessage());
+        }
     }
 
     /**
