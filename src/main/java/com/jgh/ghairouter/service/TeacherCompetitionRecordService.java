@@ -54,7 +54,7 @@ public interface TeacherCompetitionRecordService extends IService<TeacherCompeti
     BigDecimal getMyTotalScore(Long userId);
 
     /**
-     * 导出记录为Excel，可按比赛分类过滤
+     * 导出所有记录为Excel，按比赛分类分sheet页
      */
-    byte[] exportRecordsToExcel(String typeName);
+    byte[] exportRecordsToExcel();
 }

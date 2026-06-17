@@ -152,9 +152,8 @@ public class TeacherCompetitionRecordController {
     @GetMapping("/admin/export")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @Operation(summary = "导出比赛得分详情Excel")
-    public void exportRecords(@RequestParam(value = "typeName", required = false) String typeName,
-                              HttpServletResponse response) {
-        byte[] excelData = teacherCompetitionRecordService.exportRecordsToExcel(typeName);
+    public void exportRecords(HttpServletResponse response) {
+        byte[] excelData = teacherCompetitionRecordService.exportRecordsToExcel();
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition",
                 "attachment; filename=competition_scores.xlsx");
