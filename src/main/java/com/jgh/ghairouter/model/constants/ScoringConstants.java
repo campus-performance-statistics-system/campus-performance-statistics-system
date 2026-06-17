@@ -63,7 +63,7 @@ public final class ScoringConstants {
         return switch (competitionRank) {
             case RANK_COLLEGE -> switch (gradeName) {
                 case GRADE_FIRST -> COLLEGE_FIRST;
-                case GRADE_OTHER -> COLLEGE_OTHER;
+                case GRADE_SECOND, GRADE_THIRD, GRADE_OTHER -> COLLEGE_OTHER;
                 case GRADE_EXCELLENCE -> COLLEGE_EXCELLENCE;
                 default -> BigDecimal.ZERO;
             };
@@ -128,7 +128,7 @@ public final class ScoringConstants {
      */
     public static List<String> getAvailableGrades(String rank) {
         return switch (rank) {
-            case RANK_COLLEGE -> List.of(GRADE_FIRST, GRADE_OTHER, GRADE_EXCELLENCE, GRADE_NO_AWARD);
+            case RANK_COLLEGE -> List.of(GRADE_FIRST, GRADE_SECOND, GRADE_THIRD, GRADE_OTHER, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             case RANK_PROVINCIAL -> List.of(GRADE_SECOND, GRADE_THIRD, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             case RANK_NATIONAL -> List.of(GRADE_FIRST, GRADE_SECOND, GRADE_THIRD, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             default -> List.of();
