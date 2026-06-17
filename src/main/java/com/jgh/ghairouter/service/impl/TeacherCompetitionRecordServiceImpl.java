@@ -533,8 +533,12 @@ public class TeacherCompetitionRecordServiceImpl
     // ==================== 导出Excel ====================
 
     @Override
-    public byte[] exportRecordsToExcel() {
-        List<TeacherCompetitionRecord> records = this.list(QueryWrapper.create().orderBy("create_time", true));
+    public byte[] exportRecordsToExcel(String typeName) {
+        QueryWrapper wrapper = QueryWrapper.create().orderBy("create_time", true);
+        if (StrUtil.isNotBlank(typeName)) {
+            wrapper.eq("type_name", typeName);
+        }
+        List<TeacherCompetitionRecord> records = this.list(wrapper);
 
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
