@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 比赛记录 VO（含关联信息）
+ * 比赛记录 VO（v2 重构：移除分类/活动类型字段，新增 typeName）
  */
 @Data
 public class CompetitionRecordVO implements Serializable {
@@ -20,10 +20,7 @@ public class CompetitionRecordVO implements Serializable {
     private Long id;
     private Long userId;
     private String userName;
-    private Long categoryId;
-    private String categoryName;
-    private Long activityTypeId;
-    private String activityTypeName;
+    private String typeName;
     private String competitionName;
     private String sponsorUnit;
     private String competitionRank;
@@ -39,7 +36,6 @@ public class CompetitionRecordVO implements Serializable {
     private String autoReviewComment;
     private String adminReviewStatus;
     private String adminReviewComment;
-    private Long adminId;
     private String adminName;
     private LocalDateTime adminReviewTime;
     private LocalDateTime createTime;

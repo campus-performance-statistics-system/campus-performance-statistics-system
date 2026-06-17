@@ -16,32 +16,28 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 比赛记录 实体类
+ * 教师比赛记录 实体类（v2 重构：由 competition_record 重命名而来）
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("competition_record")
-public class CompetitionRecord implements Serializable {
+@Table("teacher_competition_record")
+public class TeacherCompetitionRecord implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
+    @Id(keyType = KeyType.Auto)
     private Long id;
+
+    /** 记录类型名称 */
+    @Column("type_name")
+    private String typeName;
 
     /** 填报用户ID */
     @Column("user_id")
     private Long userId;
-
-    /** 比赛大类ID */
-    @Column("category_id")
-    private Long categoryId;
-
-    /** 活动细分类型ID */
-    @Column("activity_type_id")
-    private Long activityTypeId;
 
     /** 比赛全称 */
     @Column("competition_name")
@@ -78,30 +74,6 @@ public class CompetitionRecord implements Serializable {
     /** 参赛/获奖证明图片（base64数据） */
     @Column("proof_image_data")
     private String proofImageData;
-
-    /** 自动审核状态 */
-    @Column("auto_review_status")
-    private String autoReviewStatus;
-
-    /** AI自动审核分析意见 */
-    @Column("auto_review_comment")
-    private String autoReviewComment;
-
-    /** 管理员审核状态 */
-    @Column("admin_review_status")
-    private String adminReviewStatus;
-
-    /** 管理员审核意见 */
-    @Column("admin_review_comment")
-    private String adminReviewComment;
-
-    /** 审核管理员ID */
-    @Column("admin_id")
-    private Long adminId;
-
-    /** 管理员审核时间 */
-    @Column("admin_review_time")
-    private LocalDateTime adminReviewTime;
 
     /** 创建时间 */
     @Column("create_time")

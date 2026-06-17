@@ -12,7 +12,7 @@ import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
 import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
 import com.jgh.ghairouter.model.vo.TeacherScoreVO;
 import com.jgh.ghairouter.service.AiReviewService;
-import com.jgh.ghairouter.service.CompetitionRecordService;
+import com.jgh.ghairouter.service.TeacherCompetitionRecordService;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -29,7 +29,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 比赛记录服务实现。
+ * 教师比赛记录服务实现（v2 重构）。
  * 分数分配规则（硬编码）：
  * - 单人：100%
  * - 两人：负责人70%，另一人30%
@@ -39,17 +39,16 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordMapper, CompetitionRecord>
-        implements CompetitionRecordService {
+public class TeacherCompetitionRecordServiceImpl
+        extends ServiceImpl<TeacherCompetitionRecordMapper, TeacherCompetitionRecord>
+        implements TeacherCompetitionRecordService {
 
     @Resource
     private AiReviewService aiReviewService;
     @Resource
     private UserMapper userMapper;
     @Resource
-    private CategoryMapper categoryMapper;
-    @Resource
-    private ActivityTypeMapper activityTypeMapper;
+    private TeacherCompetitionAuditRecordMapper auditMapper;
     @Resource
     private TeacherCompetitionScoreMapper teacherScoreMapper;
 
@@ -67,37 +66,17 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     private static final BigDecimal RATIO_N_LEADER = new BigDecimal("0.50");
     private static final BigDecimal RATIO_N_REST = new BigDecimal("0.50");
 
-    /**
-     * 获取分配规则描述
-     */
-    public static String getDistributeRuleDesc(int memberCount) {
-        return switch (memberCount) {
-            case 2 -> "两人完成，负责人70%，另一人30%";
-            case 3 -> "三人完成，负责人60%，其余两人各20%";
-            default -> "四人及以上，主持人50%，剩余所有人平分50%";
-        };
-    }
+    /** 默认记录类型 */
+    private static final String DEFAULT_TYPE_NAME = "教师获奖";
 
     // ==================== 用户提交比赛记录 ====================
 
     @Override
-    public Long addRecord(Long userId, Long categoryId, Long activityTypeId,
+    public Long addRecord(Long userId, String typeName,
                           String competitionName, String sponsorUnit,
                           String competitionRank, String gradeName, BigDecimal baseScore,
                           Integer teamMemberNum, Long firstAuthorId,
                           List<Long> otherAuthorIds, MultipartFile file) {
-        // 校验分类
-        if (categoryId != null) {
-            Category category = categoryMapper.selectOneById(categoryId);
-            if (category == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "比赛分类不存在");
-        }
-        // 校验活动类型
-        if (activityTypeId != null) {
-            ActivityType activityType = activityTypeMapper.selectOneById(activityTypeId);
-            if (activityType == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "活动类型不存在");
-        }
-
-        // 团队人数
         int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
 
         // 读取文件 base64
@@ -110,20 +89,11 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         }
 
         // 构建记录
-        CompetitionRecord record = new CompetitionRecord();
+        TeacherCompetitionRecord record = new TeacherCompetitionRecord();
         record.setUserId(userId);
-        record.setCategoryId(categoryId);
-        record.setActivityTypeId(activityTypeId);
+        record.setTypeName(StrUtil.isBlank(typeName) ? DEFAULT_TYPE_NAME : typeName);
         record.setCompetitionName(competitionName);
-        // 颁奖单位：优先使用传入值，为空则从活动类型自动获取
-        String unit = sponsorUnit;
-        if (StrUtil.isBlank(unit) && activityTypeId != null) {
-            ActivityType at = activityTypeMapper.selectOneById(activityTypeId);
-            if (at != null && StrUtil.isNotBlank(at.getSponsorUnit())) {
-                unit = at.getSponsorUnit();
-            }
-        }
-        record.setSponsorUnit(unit);
+        record.setSponsorUnit(sponsorUnit);
         record.setCompetitionRank(competitionRank);
         record.setGradeName(gradeName);
         record.setBaseScore(baseScore);
@@ -134,11 +104,20 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                     .map(String::valueOf).collect(Collectors.joining(",")));
         }
         record.setProofImageData(base64);
-        record.setAutoReviewStatus(ReviewStatusEnum.PENDING.getValue());
-        record.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
 
         boolean saved = this.save(record);
         if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "提交失败");
+
+        // 创建审核记录
+        TeacherCompetitionAuditRecord audit = new TeacherCompetitionAuditRecord();
+        audit.setRecordId(record.getId());
+        audit.setRecordType(record.getTypeName());
+        audit.setAutoReviewStatus(ReviewStatusEnum.PENDING.getValue());
+        audit.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
+        LocalDateTime now = LocalDateTime.now();
+        audit.setCreateTime(now);
+        audit.setUpdateTime(now);
+        auditMapper.insert(audit);
 
         // 触发AI审核
         if (file != null && !file.isEmpty()) {
@@ -156,13 +135,13 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     // ==================== 管理员添加比赛记录 ====================
 
     @Override
-    public Long adminAddRecord(Long adminId, String competitionName, String sponsorUnit,
-                                Long rankId, String gradeName, BigDecimal baseScore,
+    public Long adminAddRecord(Long adminId, String typeName,
+                                String competitionName, String sponsorUnit,
+                                String competitionRank, String gradeName, BigDecimal baseScore,
                                 Integer teamMemberNum, Long firstAuthorId,
                                 List<Long> otherAuthorIds, MultipartFile file) {
         int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
 
-        // 读取文件base64（可选）
         String base64 = null;
         if (file != null && !file.isEmpty()) {
             try {
@@ -172,16 +151,9 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
             }
         }
 
-        // 竞赛等级映射
-        String competitionRank;
-        if (rankId == 1) competitionRank = "国家级";
-        else if (rankId == 2) competitionRank = "区级";
-        else if (rankId == 3) competitionRank = "校级";
-        else competitionRank = "校级";
-
-        // 构建记录
-        CompetitionRecord record = new CompetitionRecord();
+        TeacherCompetitionRecord record = new TeacherCompetitionRecord();
         record.setUserId(adminId);
+        record.setTypeName(StrUtil.isBlank(typeName) ? DEFAULT_TYPE_NAME : typeName);
         record.setCompetitionName(competitionName);
         record.setSponsorUnit(sponsorUnit);
         record.setCompetitionRank(competitionRank);
@@ -194,14 +166,23 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                     .map(String::valueOf).collect(Collectors.joining(",")));
         }
         record.setProofImageData(base64);
-        record.setAutoReviewStatus(ReviewStatusEnum.PASSED.getValue());
-        record.setAdminReviewStatus(ReviewStatusEnum.PASSED.getValue());
-        record.setAdminId(adminId);
-        record.setAdminReviewTime(LocalDateTime.now());
-        record.setAdminReviewComment("管理员直接录入");
 
         boolean saved = this.save(record);
         if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "添加失败");
+
+        // 创建审核记录（管理员直接通过）
+        TeacherCompetitionAuditRecord audit = new TeacherCompetitionAuditRecord();
+        audit.setRecordId(record.getId());
+        audit.setRecordType(record.getTypeName());
+        audit.setAutoReviewStatus(ReviewStatusEnum.PASSED.getValue());
+        audit.setAdminReviewStatus(ReviewStatusEnum.PASSED.getValue());
+        audit.setAdminId(adminId);
+        LocalDateTime auditNow = LocalDateTime.now();
+        audit.setAdminReviewTime(auditNow);
+        audit.setAdminReviewComment("管理员直接录入");
+        audit.setCreateTime(auditNow);
+        audit.setUpdateTime(auditNow);
+        auditMapper.insert(audit);
 
         // 计算并保存个人得分明细
         if ("未获奖".equals(gradeName)) {
@@ -215,12 +196,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
     // ==================== 分数计算 ====================
 
-    /**
-     * 多人团队分数分配。
-     * 负责人额外 +2 基础分（参与院级以上比赛：2分/项）。
-     * baseScore 为获奖加分（bonus），按团队比例分配。
-     */
-    private void saveTeacherScores(CompetitionRecord record, BigDecimal bonus,
+    private void saveTeacherScores(TeacherCompetitionRecord record, BigDecimal bonus,
                                     int memberNum, Long firstAuthorId,
                                     List<Long> otherAuthorIds) {
         List<TeacherCompetitionScore> scores = new ArrayList<>();
@@ -228,11 +204,9 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         final BigDecimal LEADER_BASE = new BigDecimal("2");
 
         if (memberNum == 1) {
-            // 单人：负责人得2基础分 + 全部加分
             BigDecimal total = LEADER_BASE.add(bonus);
             scores.add(buildScore(record.getId(), firstAuthorId, total, 1, now));
         } else if (memberNum == 2) {
-            // 两人：负责人 2 + bonus*70%，成员 bonus*30%
             scores.add(buildScore(record.getId(), firstAuthorId,
                     LEADER_BASE.add(bonus.multiply(RATIO_2_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
             if (CollUtil.isNotEmpty(otherAuthorIds) && !otherAuthorIds.get(0).equals(firstAuthorId)) {
@@ -240,7 +214,6 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                         bonus.multiply(RATIO_2_MEMBER).setScale(3, RoundingMode.HALF_UP), 0, now));
             }
         } else if (memberNum == 3) {
-            // 三人：负责人 2 + bonus*60%，成员 bonus*20%
             scores.add(buildScore(record.getId(), firstAuthorId,
                     LEADER_BASE.add(bonus.multiply(RATIO_3_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
             BigDecimal perMember = bonus.multiply(RATIO_3_MEMBER).setScale(3, RoundingMode.HALF_UP);
@@ -252,7 +225,6 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                 }
             }
         } else {
-            // 四人及以上：负责人 2 + bonus*50%，其余平分 bonus*50%
             scores.add(buildScore(record.getId(), firstAuthorId,
                     LEADER_BASE.add(bonus.multiply(RATIO_N_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
             int otherCount = memberNum - 1;
@@ -272,13 +244,9 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         }
     }
 
-    /**
-     * 未获奖团队：只有负责人得分
-     */
-    private void saveNoAwardScores(CompetitionRecord record, BigDecimal baseScore,
+    private void saveNoAwardScores(TeacherCompetitionRecord record, BigDecimal baseScore,
                                     Long firstAuthorId, List<Long> otherAuthorIds) {
         LocalDateTime now = LocalDateTime.now();
-        // 未获奖：只有负责人得2分基础分
         teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, new BigDecimal("2"), 1, now));
         if (CollUtil.isNotEmpty(otherAuthorIds)) {
             for (Long otherId : otherAuthorIds) {
@@ -309,10 +277,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .eq("user_id", req.getUserId())
-                .eq("category_id", req.getCategoryId())
-                .eq("activity_type_id", req.getActivityTypeId())
-                .eq("auto_review_status", req.getAutoReviewStatus())
-                .eq("admin_review_status", req.getAdminReviewStatus())
+                .eq("type_name", req.getTypeName())
                 .like("competition_name", req.getCompetitionName());
         if (StrUtil.isNotBlank(req.getSortField())) {
             wrapper.orderBy(req.getSortField(), "ascend".equals(req.getSortOrder()));
@@ -322,7 +287,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     }
 
     @Override
-    public CompetitionRecordVO getRecordVO(CompetitionRecord record) {
+    public CompetitionRecordVO getRecordVO(TeacherCompetitionRecord record) {
         if (record == null) return null;
         CompetitionRecordVO vo = new CompetitionRecordVO();
         BeanUtil.copyProperties(record, vo);
@@ -330,14 +295,6 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         if (record.getUserId() != null) {
             User u = userMapper.selectOneById(record.getUserId());
             if (u != null) vo.setUserName(u.getUserName());
-        }
-        if (record.getCategoryId() != null) {
-            Category c = categoryMapper.selectOneById(record.getCategoryId());
-            if (c != null) vo.setCategoryName(c.getName());
-        }
-        if (record.getActivityTypeId() != null) {
-            ActivityType at = activityTypeMapper.selectOneById(record.getActivityTypeId());
-            if (at != null) vo.setActivityTypeName(at.getName());
         }
         if (record.getFirstAuthorId() != null) {
             User leader = userMapper.selectOneById(record.getFirstAuthorId());
@@ -352,10 +309,22 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
                     }).collect(Collectors.toList());
             vo.setOtherAuthorNames(String.join("、", names));
         }
-        if (record.getAdminId() != null) {
-            User admin = userMapper.selectOneById(record.getAdminId());
-            if (admin != null) vo.setAdminName(admin.getUserName());
+
+        // 从审计表获取审核信息
+        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+                QueryWrapper.create().eq("record_id", record.getId()));
+        if (audit != null) {
+            vo.setAutoReviewStatus(audit.getAutoReviewStatus());
+            vo.setAutoReviewComment(audit.getAutoReviewComment());
+            vo.setAdminReviewStatus(audit.getAdminReviewStatus());
+            vo.setAdminReviewComment(audit.getAdminReviewComment());
+            if (audit.getAdminId() != null) {
+                User admin = userMapper.selectOneById(audit.getAdminId());
+                if (admin != null) vo.setAdminName(admin.getUserName());
+            }
+            vo.setAdminReviewTime(audit.getAdminReviewTime());
         }
+
         // 查询得分明细
         List<TeacherCompetitionScore> scoreList = teacherScoreMapper.selectListByQuery(
                 QueryWrapper.create().eq("record_id", record.getId()));
@@ -380,7 +349,20 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
     public Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest req) {
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
-        Page<CompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), getQueryWrapper(req));
+        // 如果是管理员查询，需要通过 join 过滤审核状态
+        QueryWrapper wrapper = getQueryWrapper(req);
+        if (StrUtil.isNotBlank(req.getAdminReviewStatus())) {
+            // 需要关联审计表过滤
+            Page<TeacherCompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+            List<CompetitionRecordVO> voList = recordPage.getRecords().stream()
+                    .map(this::getRecordVO)
+                    .filter(vo -> req.getAdminReviewStatus().equals(vo.getAdminReviewStatus()))
+                    .collect(Collectors.toList());
+            Page<CompetitionRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
+            voPage.setRecords(voList);
+            return voPage;
+        }
+        Page<TeacherCompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
         List<CompetitionRecordVO> voList = recordPage.getRecords().stream()
                 .map(this::getRecordVO)
                 .collect(Collectors.toList());
@@ -396,16 +378,13 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
-                .eq("category_id", req.getCategoryId())
-                .eq("activity_type_id", req.getActivityTypeId())
-                .eq("auto_review_status", req.getAutoReviewStatus())
-                .eq("admin_review_status", req.getAdminReviewStatus())
+                .eq("type_name", req.getTypeName())
                 .like("competition_name", req.getCompetitionName())
                 .where("(user_id = ? OR first_author_id = ? OR other_author_ids LIKE ?)",
                         userId, userId, "%" + userId + "%");
         wrapper.orderBy("create_time", false);
 
-        Page<CompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+        Page<TeacherCompetitionRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
         List<CompetitionRecordVO> voList = recordPage.getRecords().stream()
                 .map(record -> {
                     CompetitionRecordVO vo = getRecordVO(record);
@@ -445,27 +424,29 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
         if (statusEnum == ReviewStatusEnum.PENDING)
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核状态不能为待审核");
 
-        CompetitionRecord record = this.getById(recordId);
+        TeacherCompetitionRecord record = this.getById(recordId);
         if (record == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "比赛记录不存在");
+
+        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+                QueryWrapper.create().eq("record_id", recordId));
+        if (audit == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "审核记录不存在");
 
         if (statusEnum == ReviewStatusEnum.PASSED && StrUtil.isBlank(reviewComment))
             reviewComment = "审核通过";
 
-        record.setAdminReviewStatus(reviewStatus);
-        record.setAdminReviewComment(reviewComment);
-        record.setAdminId(adminId);
-        record.setAdminReviewTime(LocalDateTime.now());
+        audit.setAdminReviewStatus(reviewStatus);
+        audit.setAdminReviewComment(reviewComment);
+        audit.setAdminId(adminId);
+        audit.setAdminReviewTime(LocalDateTime.now());
 
-        if (!this.updateById(record))
+        if (auditMapper.update(audit) <= 0)
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "审核失败");
 
         // 审核通过后计算并保存个人得分
         if (statusEnum == ReviewStatusEnum.PASSED) {
-            // 先清除旧得分记录
             teacherScoreMapper.deleteByQuery(
                     QueryWrapper.create().eq("record_id", recordId));
 
-            // 解析团队成员
             List<Long> otherAuthorIds = new ArrayList<>();
             if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
                 for (String idStr : record.getOtherAuthorIds().split(",")) {
@@ -492,7 +473,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
     @Override
     public byte[] exportRecordsToExcel() {
-        List<CompetitionRecord> records = this.list(QueryWrapper.create().orderBy("create_time", true));
+        List<TeacherCompetitionRecord> records = this.list(QueryWrapper.create().orderBy("create_time", true));
 
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
@@ -512,7 +493,7 @@ public class CompetitionRecordServiceImpl extends ServiceImpl<CompetitionRecordM
 
             int rowIdx = 1;
             int seq = 1;
-            for (CompetitionRecord record : records) {
+            for (TeacherCompetitionRecord record : records) {
                 CompetitionRecordVO vo = getRecordVO(record);
                 if (vo == null) continue;
 

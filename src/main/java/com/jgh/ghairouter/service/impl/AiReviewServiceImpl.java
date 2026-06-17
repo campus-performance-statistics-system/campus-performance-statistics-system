@@ -4,10 +4,11 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import com.jgh.ghairouter.mapper.CompetitionRecordMapper;
-import com.jgh.ghairouter.model.entity.CompetitionRecord;
+import com.jgh.ghairouter.mapper.TeacherCompetitionAuditRecordMapper;
+import com.jgh.ghairouter.model.entity.TeacherCompetitionAuditRecord;
 import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
 import com.jgh.ghairouter.service.AiReviewService;
+import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,13 +24,14 @@ import java.util.Base64;
 
 /**
  * AI自动审核服务实现（使用 DashScope OpenAI 兼容 API 直接调用视觉模型）
+ * v2 重构：审核结果写入 teacher_competition_audit_record 表
  */
 @Slf4j
 @Service
 public class AiReviewServiceImpl implements AiReviewService {
 
     @Resource
-    private CompetitionRecordMapper competitionRecordMapper;
+    private TeacherCompetitionAuditRecordMapper auditMapper;
 
     /**
      * 使用的视觉模型
@@ -53,20 +55,20 @@ public class AiReviewServiceImpl implements AiReviewService {
      */
     private static final String REVIEW_PROMPT = """
             你是比赛记录审核助手，仅执行图片文字和用户输入名称的比对审核，严格遵守全部规则，只返回标准JSON字符串，禁止输出任何额外文字、注释、说明、思考过程、换行、markdown标记。
-            
+
             ## 审核判断标准
             1. 图片识别出的赛事/证书/活动名称 和 用户提供名称完全一致 → isPass: true
             2. 图片名称是目标名称的标准简称、官方全称、合理同义变体 → isPass: true
             3. 图片名称和目标名称差异明显、不属于同义变体 → isPass: false
             4. 图片模糊、文字残缺、无法识别完整名称、无法确认匹配度 → isPass: false
             5. 存在任何不确定、模棱两可的场景，统一判定为不通过，不得折中
-            
+
             ## 强制输出规范
             1. 唯一输出格式（固定JSON结构，字段不可增删改名）：{"isPass": 布尔值, "content": "具体判断依据文本"}
             2. 布尔值仅允许 true / false，不加引号；content必须填写具象、客观的理由，禁止模糊描述。
             3. 全程只输出一行纯净JSON字符串，不能添加：```、json、前置说明、思考过程、换行、#、解释文字、多余空格、分段描述。（required）
             4. 输出前强制自检：①是否只有JSON ②字段名称正确 ③布尔值格式无误 ④理由具体客观，不符合则重新生成。
-            
+
             ## 正确输出样例参考
             {"isPass":true,"content":"图片证书文字为2026大学生程序设计大赛，用户输入全称一致，匹配通过"}
             {"isPass":false,"content":"图片显示活动名称校园歌手赛，用户输入为全国机器人大赛，名称完全不相关，判定不通过"}
@@ -92,7 +94,6 @@ public class AiReviewServiceImpl implements AiReviewService {
                 throw new RuntimeException("图片数据为空");
             }
 
-            // 解码 base64 → 调用视觉模型识别图片
             byte[] imageBytes = Base64.getDecoder().decode(imageBase64);
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.append(REVIEW_PROMPT);
@@ -103,7 +104,6 @@ public class AiReviewServiceImpl implements AiReviewService {
 
             log.info("AI审核响应: {}", aiResponse);
 
-            // 解析 JSON 响应：{"isPass": true/false, "content": "理由"}
             try {
                 JSONObject result = JSONUtil.parseObj(aiResponse);
                 Boolean isPass = result.getBool("isPass", false);
@@ -115,7 +115,6 @@ public class AiReviewServiceImpl implements AiReviewService {
                 }
                 comment = StrUtil.isBlank(content) ? aiResponse : content;
             } catch (Exception e) {
-                // JSON 解析失败，视为审核不通过
                 log.warn("AI返回格式异常，按FAILED处理: {}", aiResponse);
                 status = ReviewStatusEnum.FAILED.getValue();
                 comment = aiResponse;
@@ -130,41 +129,32 @@ public class AiReviewServiceImpl implements AiReviewService {
     }
 
     private void updateReviewResult(Long recordId, String status, String comment) {
-        CompetitionRecord record = competitionRecordMapper.selectOneById(recordId);
-        if (record != null) {
-            record.setAutoReviewStatus(status);
-            record.setAutoReviewComment(comment);
-            competitionRecordMapper.update(record);
+        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+                QueryWrapper.create().eq("record_id", recordId));
+        if (audit != null) {
+            audit.setAutoReviewStatus(status);
+            audit.setAutoReviewComment(comment);
+            auditMapper.update(audit);
             log.info("自动审核完成: recordId={}, status={}", recordId, status);
         }
     }
 
     /**
      * 调用视觉模型识别图片
-     * 使用 DashScope OpenAI 兼容 API 直接调用通义千问视觉模型
-     *
-     * @param imageBytes 图片字节数据
-     * @param mimeType   图片 MIME 类型（如 image/png）
-     * @param prompt     提示词
-     * @return 模型返回的文本内容
      */
     private String recognizeImage(byte[] imageBytes, String mimeType, String prompt) {
         try {
-            // 将图片转换为 Base64 data URL
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String imageUrl = "data:" + mimeType + ";base64," + base64Image;
 
-            // 构建请求体（OpenAI 兼容格式）
             JSONObject requestBody = new JSONObject();
             requestBody.set("model", model);
 
-            // 构建用户消息（多模态：图片 + 文本）
             JSONObject userMessage = new JSONObject();
             userMessage.set("role", "user");
 
             JSONArray contentArray = new JSONArray();
 
-            // 图片部分
             JSONObject imageContent = new JSONObject();
             imageContent.set("type", "image_url");
             JSONObject imageUrlObj = new JSONObject();
@@ -172,7 +162,6 @@ public class AiReviewServiceImpl implements AiReviewService {
             imageContent.set("image_url", imageUrlObj);
             contentArray.add(imageContent);
 
-            // 文本部分
             JSONObject textContent = new JSONObject();
             textContent.set("type", "text");
             textContent.set("text", prompt);
@@ -184,7 +173,6 @@ public class AiReviewServiceImpl implements AiReviewService {
             messagesArray.add(userMessage);
             requestBody.set("messages", messagesArray);
 
-            // 发送 HTTP 请求
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL))
                     .header("Content-Type", "application/json")
@@ -200,7 +188,6 @@ public class AiReviewServiceImpl implements AiReviewService {
                 throw new RuntimeException("视觉模型调用失败，状态码: " + response.statusCode());
             }
 
-            // 解析 OpenAI 格式响应
             JSONObject responseJson = JSONUtil.parseObj(response.body());
             JSONArray choices = responseJson.getJSONArray("choices");
             if (choices != null && !choices.isEmpty()) {

@@ -1,7 +1,7 @@
 package com.jgh.ghairouter.service;
 
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
-import com.jgh.ghairouter.model.entity.CompetitionRecord;
+import com.jgh.ghairouter.model.entity.TeacherCompetitionRecord;
 import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -12,14 +12,14 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 比赛记录 服务层
+ * 教师比赛记录 服务层
  */
-public interface CompetitionRecordService extends IService<CompetitionRecord> {
+public interface TeacherCompetitionRecordService extends IService<TeacherCompetitionRecord> {
 
     /**
      * 用户提交比赛记录
      */
-    Long addRecord(Long userId, Long categoryId, Long activityTypeId,
+    Long addRecord(Long userId, String typeName,
                    String competitionName, String sponsorUnit,
                    String competitionRank, String gradeName, BigDecimal baseScore,
                    Integer teamMemberNum, Long firstAuthorId,
@@ -27,7 +27,7 @@ public interface CompetitionRecordService extends IService<CompetitionRecord> {
 
     QueryWrapper getQueryWrapper(CompetitionQueryRequest queryRequest);
 
-    CompetitionRecordVO getRecordVO(CompetitionRecord record);
+    CompetitionRecordVO getRecordVO(TeacherCompetitionRecord record);
 
     Page<CompetitionRecordVO> pageRecords(CompetitionQueryRequest queryRequest);
 
@@ -36,8 +36,9 @@ public interface CompetitionRecordService extends IService<CompetitionRecord> {
     /**
      * 管理员直接添加比赛记录（指定得分）
      */
-    Long adminAddRecord(Long adminId, String competitionName, String sponsorUnit,
-                        Long rankId, String gradeName, BigDecimal baseScore,
+    Long adminAddRecord(Long adminId, String typeName,
+                        String competitionName, String sponsorUnit,
+                        String competitionRank, String gradeName, BigDecimal baseScore,
                         Integer teamMemberNum, Long firstAuthorId,
                         List<Long> otherAuthorIds, MultipartFile file);
 

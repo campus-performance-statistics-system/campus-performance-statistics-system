@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 管理员添加比赛记录请求
+ * 管理员添加比赛记录请求（v2 重构：rankId 改为 competitionRank 字符串）
  */
 @Data
 public class AdminAddCompetitionRequest implements Serializable {
@@ -22,8 +22,8 @@ public class AdminAddCompetitionRequest implements Serializable {
     /** 颁奖/主办单位 */
     private String sponsorUnit;
 
-    /** 竞赛等级ID（关联competition_rank） */
-    private Long rankId;
+    /** 竞赛等级：院级/自治区级/国家级 */
+    private String competitionRank;
 
     /** 获奖等级名称：一等奖/二等奖/三等奖/优秀奖/未获奖 */
     private String gradeName;
