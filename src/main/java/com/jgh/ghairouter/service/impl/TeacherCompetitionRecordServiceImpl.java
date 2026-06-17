@@ -25,6 +25,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -603,5 +605,74 @@ public class TeacherCompetitionRecordServiceImpl
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public byte[] exportAttachmentsToZip() {
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(bos)) {
+
+            int typeIndex = 0;
+            for (String typeName : EXPORT_TYPE_NAMES) {
+                typeIndex++;
+                List<TeacherCompetitionRecord> typeRecords = this.list(
+                        QueryWrapper.create()
+                                .eq("type_name", typeName)
+                                .orderBy("create_time", true));
+
+                int seq = 1;
+                for (TeacherCompetitionRecord record : typeRecords) {
+                    if (StrUtil.isBlank(record.getProofImageData())) {
+                        seq++;
+                        continue;
+                    }
+
+                    CompetitionRecordVO vo = getRecordVO(record);
+                    if (vo == null) {
+                        seq++;
+                        continue;
+                    }
+
+                    // 文件名：序号-比赛名称-提交记录的用户名.png
+                    String competitionName = sanitizeFilename(
+                            StrUtil.isNotBlank(record.getCompetitionName())
+                                    ? record.getCompetitionName() : "未知比赛");
+                    String userName = sanitizeFilename(
+                            vo.getUserName() != null ? vo.getUserName() : "未知用户");
+                    String fileName = seq + "-" + competitionName + "-" + userName + ".png";
+
+                    // ZIP 路径：所有附件/分类名/文件名
+                    String zipPath = "所有附件/" + typeName + "/" + fileName;
+
+                    // 解码 base64 图片
+                    byte[] imageBytes;
+                    try {
+                        imageBytes = java.util.Base64.getDecoder().decode(record.getProofImageData());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("附件 base64 解码失败: recordId={}", record.getId());
+                        seq++;
+                        continue;
+                    }
+
+                    ZipEntry entry = new ZipEntry(zipPath);
+                    zos.putNextEntry(entry);
+                    zos.write(imageBytes);
+                    zos.closeEntry();
+
+                    seq++;
+                }
+            }
+
+            zos.finish();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "附件压缩包生成失败: " + e.getMessage());
+        }
+        return bos.toByteArray();
+    }
+
+    /** 清理文件名中的非法字符 */
+    private String sanitizeFilename(String name) {
+        if (StrUtil.isBlank(name)) return "未知";
+        return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
     }
 }

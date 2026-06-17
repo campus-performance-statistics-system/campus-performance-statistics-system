@@ -57,4 +57,9 @@ public interface TeacherCompetitionRecordService extends IService<TeacherCompeti
      * 导出所有记录为Excel，按比赛分类分sheet页
      */
     byte[] exportRecordsToExcel();
+
+    /**
+     * 导出所有附件为ZIP压缩包
+     */
+    byte[] exportAttachmentsToZip();
 }

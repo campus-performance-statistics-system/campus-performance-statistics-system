@@ -166,6 +166,23 @@ public class TeacherCompetitionRecordController {
         }
     }
 
+    @GetMapping("/admin/export-attachments")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "导出所有附件为ZIP压缩包")
+    public void exportAttachments(HttpServletResponse response) {
+        byte[] zipData = teacherCompetitionRecordService.exportAttachmentsToZip();
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition",
+                "attachment; filename=attachments.zip");
+        response.setContentLength(zipData.length);
+        try {
+            response.getOutputStream().write(zipData);
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "导出附件失败: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/scoring-rules")
     @Operation(summary = "获取硬编码得分规则")
     public BaseResponse<Map<String, Object>> getScoringRules() {
