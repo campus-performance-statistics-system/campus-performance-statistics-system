@@ -52,13 +52,14 @@ public class TeacherCompetitionRecordController {
             @RequestParam("firstAuthorId") Long firstAuthorId,
             @RequestParam(value = "otherAuthorIds", required = false) List<Long> otherAuthorIds,
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "scoreData", required = false) String scoreData,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
         Long recordId = teacherCompetitionRecordService.addRecord(
                 loginUser.getId(), typeName,
                 competitionName, sponsorUnit,
                 competitionRank, gradeName, baseScore,
-                teamMemberNum, firstAuthorId, otherAuthorIds, file);
+                teamMemberNum, firstAuthorId, otherAuthorIds, file, scoreData);
         return ResultUtils.success(recordId);
     }
 

@@ -3,6 +3,8 @@ package com.jgh.ghairouter.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.*;
@@ -76,7 +78,8 @@ public class TeacherCompetitionRecordServiceImpl
                           String competitionName, String sponsorUnit,
                           String competitionRank, String gradeName, BigDecimal baseScore,
                           Integer teamMemberNum, Long firstAuthorId,
-                          List<Long> otherAuthorIds, MultipartFile file) {
+                          List<Long> otherAuthorIds, MultipartFile file,
+                          String scoreData) {
         int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
 
         // 读取文件 base64
@@ -104,6 +107,7 @@ public class TeacherCompetitionRecordServiceImpl
                     .map(String::valueOf).collect(Collectors.joining(",")));
         }
         record.setProofImageData(base64);
+        record.setScoreData(scoreData);
 
         boolean saved = this.save(record);
         if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "提交失败");
@@ -197,8 +201,9 @@ public class TeacherCompetitionRecordServiceImpl
     // ==================== 分数计算 ====================
 
     /**
-     * 保存教师得分明细。
-     * @param baseScore 负责人总得分（基础2分 + 获奖加分），由前端 getLeaderTotalScore 计算提交
+     * 保存教师得分明细（服务端计算，作为无 scoreData 时的回退方案）。
+     * 只存储获奖加分部分（不含负责人基础2分），基础2分在 getRecordVO 展示时动态添加。
+     * @param baseScore 负责人总得分（基础2分 + 获奖加分）
      */
     private void saveTeacherScores(TeacherCompetitionRecord record, BigDecimal baseScore,
                                     int memberNum, Long firstAuthorId,
@@ -214,12 +219,13 @@ public class TeacherCompetitionRecordServiceImpl
         }
 
         if (memberNum == 1) {
-            // 单人：负责人获得全部 = 基础2分 + 加分
-            scores.add(buildScore(record.getId(), firstAuthorId, baseScore, 1, now));
+            // 单人：负责人获得全部加分（不含基础2分）
+            scores.add(buildScore(record.getId(), firstAuthorId,
+                    actualBonus.setScale(3, RoundingMode.HALF_UP), 1, now));
         } else if (memberNum == 2) {
             // 两人：负责人70%，另一人30%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    LEADER_BASE.add(actualBonus.multiply(RATIO_2_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
+                    actualBonus.multiply(RATIO_2_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
             if (CollUtil.isNotEmpty(otherAuthorIds) && !otherAuthorIds.get(0).equals(firstAuthorId)) {
                 scores.add(buildScore(record.getId(), otherAuthorIds.get(0),
                         actualBonus.multiply(RATIO_2_MEMBER).setScale(3, RoundingMode.HALF_UP), 0, now));
@@ -227,7 +233,7 @@ public class TeacherCompetitionRecordServiceImpl
         } else if (memberNum == 3) {
             // 三人：负责人60%，其余两人各20%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    LEADER_BASE.add(actualBonus.multiply(RATIO_3_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
+                    actualBonus.multiply(RATIO_3_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
             BigDecimal perMember = actualBonus.multiply(RATIO_3_MEMBER).setScale(3, RoundingMode.HALF_UP);
             if (CollUtil.isNotEmpty(otherAuthorIds)) {
                 for (Long otherId : otherAuthorIds) {
@@ -239,7 +245,7 @@ public class TeacherCompetitionRecordServiceImpl
         } else {
             // 四人及以上：负责人50%，其余人平分50%
             scores.add(buildScore(record.getId(), firstAuthorId,
-                    LEADER_BASE.add(actualBonus.multiply(RATIO_N_LEADER)).setScale(3, RoundingMode.HALF_UP), 1, now));
+                    actualBonus.multiply(RATIO_N_LEADER).setScale(3, RoundingMode.HALF_UP), 1, now));
             int otherCount = memberNum - 1;
             if (otherCount > 0 && CollUtil.isNotEmpty(otherAuthorIds)) {
                 BigDecimal restBonus = actualBonus.multiply(RATIO_N_REST);
@@ -260,13 +266,37 @@ public class TeacherCompetitionRecordServiceImpl
     private void saveNoAwardScores(TeacherCompetitionRecord record, BigDecimal baseScore,
                                     Long firstAuthorId, List<Long> otherAuthorIds) {
         LocalDateTime now = LocalDateTime.now();
-        teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, new BigDecimal("2"), 1, now));
+        // 未获奖：负责人加分部分为0，基础2分在 getRecordVO 展示时动态添加
+        teacherScoreMapper.insert(buildScore(record.getId(), firstAuthorId, BigDecimal.ZERO, 1, now));
         if (CollUtil.isNotEmpty(otherAuthorIds)) {
             for (Long otherId : otherAuthorIds) {
                 if (!otherId.equals(firstAuthorId)) {
                     teacherScoreMapper.insert(buildScore(record.getId(), otherId, BigDecimal.ZERO, 0, now));
                 }
             }
+        }
+    }
+
+    /**
+     * 从前端提交的 scoreData JSON 解析并保存得分明细。
+     * scoreData 格式: [{"userId":1,"score":0.75},{"userId":2,"score":0.25}]
+     * score 字段是获奖加分（不含负责人基础2分），第一项始终是负责人。
+     */
+    private void saveScoresFromData(Long recordId, String scoreData) {
+        try {
+            JSONArray arr = new JSONArray(scoreData);
+            LocalDateTime now = LocalDateTime.now();
+            for (int i = 0; i < arr.size(); i++) {
+                JSONObject entry = arr.getJSONObject(i);
+                long userId = entry.getLong("userId");
+                BigDecimal bonusScore = BigDecimal.valueOf(entry.getDouble("score"))
+                        .setScale(3, RoundingMode.HALF_UP);
+                int isLeader = (i == 0) ? 1 : 0;
+                teacherScoreMapper.insert(buildScore(recordId, userId, bonusScore, isLeader, now));
+            }
+        } catch (Exception e) {
+            log.error("解析 scoreData 失败: {}", scoreData, e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "得分数据解析失败");
         }
     }
 
@@ -338,17 +368,22 @@ public class TeacherCompetitionRecordServiceImpl
             vo.setAdminReviewTime(audit.getAdminReviewTime());
         }
 
-        // 查询得分明细
+        // 查询得分明细：personal_score 存储的是获奖加分部分，负责人展示时 +2 基础分
         List<TeacherCompetitionScore> scoreList = teacherScoreMapper.selectListByQuery(
                 QueryWrapper.create().eq("record_id", record.getId()));
         if (CollUtil.isNotEmpty(scoreList)) {
             List<TeacherScoreVO> scoreVOs = scoreList.stream()
                     .map(ts -> {
                         User u = userMapper.selectOneById(ts.getTeacherUserId());
+                        BigDecimal displayScore = ts.getPersonalScore();
+                        // 负责人在展示时加上基础2分
+                        if (ts.getIsLeader() != null && ts.getIsLeader() == 1) {
+                            displayScore = displayScore.add(new BigDecimal("2"));
+                        }
                         return TeacherScoreVO.builder()
                                 .userId(ts.getTeacherUserId())
                                 .userName(u != null ? u.getUserName() : String.valueOf(ts.getTeacherUserId()))
-                                .personalScore(ts.getPersonalScore())
+                                .personalScore(displayScore)
                                 .isLeader(ts.getIsLeader())
                                 .build();
                     })
@@ -421,7 +456,14 @@ public class TeacherCompetitionRecordServiceImpl
                 QueryWrapper.create().eq("user_id", userId));
         if (CollUtil.isEmpty(scores)) return BigDecimal.ZERO;
         return scores.stream()
-                .map(TeacherCompetitionScore::getPersonalScore)
+                .map(s -> {
+                    BigDecimal score = s.getPersonalScore();
+                    // 负责人在汇总时加上基础2分
+                    if (s.getIsLeader() != null && s.getIsLeader() == 1) {
+                        score = score.add(new BigDecimal("2"));
+                    }
+                    return score;
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -455,29 +497,35 @@ public class TeacherCompetitionRecordServiceImpl
         if (auditMapper.update(audit) <= 0)
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "审核失败");
 
-        // 审核通过后计算并保存个人得分
+        // 审核通过后保存个人得分
         if (statusEnum == ReviewStatusEnum.PASSED) {
             teacherScoreMapper.deleteByQuery(
                     QueryWrapper.create().eq("record_id", recordId));
 
-            List<Long> otherAuthorIds = new ArrayList<>();
-            if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
-                for (String idStr : record.getOtherAuthorIds().split(",")) {
-                    if (StrUtil.isNotBlank(idStr.trim())) {
-                        otherAuthorIds.add(Long.valueOf(idStr.trim()));
+            // 优先使用前端提交的 scoreData，否则回退到服务端计算
+            if (StrUtil.isNotBlank(record.getScoreData())) {
+                saveScoresFromData(recordId, record.getScoreData());
+            } else {
+                // 无 scoreData 的旧记录或管理员录入：服务端计算
+                List<Long> otherAuthorIds = new ArrayList<>();
+                if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
+                    for (String idStr : record.getOtherAuthorIds().split(",")) {
+                        if (StrUtil.isNotBlank(idStr.trim())) {
+                            otherAuthorIds.add(Long.valueOf(idStr.trim()));
+                        }
                     }
                 }
-            }
 
-            int memberNum = record.getTeamMemberNum() != null && record.getTeamMemberNum() > 0
-                    ? record.getTeamMemberNum() : 1;
-            BigDecimal score = record.getBaseScore() != null
-                    ? record.getBaseScore() : BigDecimal.ZERO;
+                int memberNum = record.getTeamMemberNum() != null && record.getTeamMemberNum() > 0
+                        ? record.getTeamMemberNum() : 1;
+                BigDecimal score = record.getBaseScore() != null
+                        ? record.getBaseScore() : BigDecimal.ZERO;
 
-            if ("未获奖".equals(record.getGradeName())) {
-                saveNoAwardScores(record, score, record.getFirstAuthorId(), otherAuthorIds);
-            } else {
-                saveTeacherScores(record, score, memberNum, record.getFirstAuthorId(), otherAuthorIds);
+                if ("未获奖".equals(record.getGradeName())) {
+                    saveNoAwardScores(record, score, record.getFirstAuthorId(), otherAuthorIds);
+                } else {
+                    saveTeacherScores(record, score, memberNum, record.getFirstAuthorId(), otherAuthorIds);
+                }
             }
         }
     }

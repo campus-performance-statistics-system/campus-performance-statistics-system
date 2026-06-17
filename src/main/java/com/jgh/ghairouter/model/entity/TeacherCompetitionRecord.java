@@ -75,6 +75,10 @@ public class TeacherCompetitionRecord implements Serializable {
     @Column("proof_image_data")
     private String proofImageData;
 
+    /** 前端计算的团队成员得分JSON（不含负责人基础2分） */
+    @Column("score_data")
+    private String scoreData;
+
     /** 创建时间 */
     @Column("create_time")
     private LocalDateTime createTime;

@@ -45,6 +45,7 @@ create table if not exists teacher_competition_record
     first_author_id      bigint                                null comment '第一负责人用户ID（关联user）',
     other_author_ids     varchar(1024)                         null comment '其他参赛教师ID，逗号分隔',
     proof_image_data     longtext                              null comment '参赛/获奖证明图片（base64数据）',
+    score_data           text                                  null comment '前端计算的团队成员得分JSON: [{"userId":1,"score":0.75},...]，不含负责人基础2分',
     create_time          datetime    default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time          datetime    default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
     is_delete            tinyint     default 0                 not null comment '是否删除',

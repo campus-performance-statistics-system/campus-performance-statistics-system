@@ -25,6 +25,7 @@ public final class ScoringConstants {
 
     // ==================== 竞赛等级 ====================
     public static final String RANK_COLLEGE = "院级";
+    public static final String RANK_SCHOOL = "校级";
     public static final String RANK_PROVINCIAL = "自治区级";
     public static final String RANK_NATIONAL = "国家级";
 
@@ -61,7 +62,7 @@ public final class ScoringConstants {
             return BigDecimal.ZERO;
         }
         return switch (competitionRank) {
-            case RANK_COLLEGE -> switch (gradeName) {
+            case RANK_COLLEGE, RANK_SCHOOL -> switch (gradeName) {
                 case GRADE_FIRST -> COLLEGE_FIRST;
                 case GRADE_SECOND, GRADE_THIRD, GRADE_OTHER -> COLLEGE_OTHER;
                 case GRADE_EXCELLENCE -> COLLEGE_EXCELLENCE;
@@ -120,7 +121,7 @@ public final class ScoringConstants {
      * 获取所有可选的竞赛等级
      */
     public static List<String> getAvailableRanks() {
-        return List.of(RANK_COLLEGE, RANK_PROVINCIAL, RANK_NATIONAL);
+        return List.of(RANK_COLLEGE, RANK_SCHOOL, RANK_PROVINCIAL, RANK_NATIONAL);
     }
 
     /**
@@ -128,7 +129,7 @@ public final class ScoringConstants {
      */
     public static List<String> getAvailableGrades(String rank) {
         return switch (rank) {
-            case RANK_COLLEGE -> List.of(GRADE_FIRST, GRADE_SECOND, GRADE_THIRD, GRADE_OTHER, GRADE_EXCELLENCE, GRADE_NO_AWARD);
+            case RANK_COLLEGE, RANK_SCHOOL -> List.of(GRADE_FIRST, GRADE_SECOND, GRADE_THIRD, GRADE_OTHER, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             case RANK_PROVINCIAL -> List.of(GRADE_SECOND, GRADE_THIRD, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             case RANK_NATIONAL -> List.of(GRADE_FIRST, GRADE_SECOND, GRADE_THIRD, GRADE_EXCELLENCE, GRADE_NO_AWARD);
             default -> List.of();

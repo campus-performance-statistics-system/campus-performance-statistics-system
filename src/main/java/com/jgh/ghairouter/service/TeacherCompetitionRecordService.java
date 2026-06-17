@@ -23,7 +23,8 @@ public interface TeacherCompetitionRecordService extends IService<TeacherCompeti
                    String competitionName, String sponsorUnit,
                    String competitionRank, String gradeName, BigDecimal baseScore,
                    Integer teamMemberNum, Long firstAuthorId,
-                   List<Long> otherAuthorIds, MultipartFile file);
+                   List<Long> otherAuthorIds, MultipartFile file,
+                   String scoreData);
 
     QueryWrapper getQueryWrapper(CompetitionQueryRequest queryRequest);
 
