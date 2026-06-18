@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS student_competition_record
     competition_topic    VARCHAR(512)                          NULL COMMENT '参赛题目/赛道（组织者行填"组织者"）',
     student_names        VARCHAR(1024)                         NULL COMMENT '参赛队员姓名',
     competition_rank     VARCHAR(32)                           NOT NULL COMMENT '竞赛等级：院级/校级/区级/自治区级/国家级/行业性全国/行业性省级',
-    grade_name           VARCHAR(32)                           NOT NULL COMMENT '获奖等级：一等奖/二等奖/三等奖/优秀奖/未获奖/奖项未出',
+    grade_name           VARCHAR(32)                           NULL COMMENT '获奖等级：一等奖/二等奖/三等奖/优秀奖/未获奖/奖项未出（组织者行为NULL）',
     award_level_text     VARCHAR(512)                          NULL COMMENT '完整获奖级别文本（如"国赛二等奖、省赛一等奖"）',
     is_organizer         TINYINT      DEFAULT 0                NOT NULL COMMENT '是否为组织者行：0-指导者行，1-组织者行',
     advisor_score_data   TEXT                                  NULL COMMENT '指导老师得分JSON数组',

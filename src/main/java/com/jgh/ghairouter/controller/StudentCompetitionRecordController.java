@@ -47,7 +47,7 @@ public class StudentCompetitionRecordController {
             @RequestParam(value = "competitionTopic", required = false) String competitionTopic,
             @RequestParam(value = "studentNames", required = false) String studentNames,
             @RequestParam("competitionRank") String competitionRank,
-            @RequestParam("gradeName") String gradeName,
+            @RequestParam(value = "gradeName", required = false) String gradeName,
             @RequestParam(value = "awardLevelText", required = false) String awardLevelText,
             @RequestParam(value = "isOrganizer", defaultValue = "0") Integer isOrganizer,
             @RequestParam(value = "advisorScoreData", required = false) String advisorScoreData,
