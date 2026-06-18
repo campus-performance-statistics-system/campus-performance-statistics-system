@@ -53,9 +53,7 @@ create table if not exists teacher_competition_record
     INDEX idx_type_name (type_name)
 ) comment '教师获奖记录' collate = utf8mb4_unicode_ci;
 
--- ===================== 教师获奖审核记录表 =====================
--- 从 competition_record 表拆分出的审核相关字段
-DROP TABLE IF EXISTS teacher_competition_audit_record;
+-- ===================== 获奖审核记录表--所有分类的比赛均适用 =====================
 CREATE TABLE IF NOT EXISTS competition_audit_record
 (
     id                   BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '审核记录ID',
@@ -75,6 +73,7 @@ CREATE TABLE IF NOT EXISTS competition_audit_record
     INDEX idx_auto_review_status (auto_review_status),
     INDEX idx_admin_review_status (admin_review_status)
 ) COMMENT '教师获奖审核记录' COLLATE utf8mb4_unicode_ci;
+
 
 -- ===================== 教师个人得分明细表 =====================
 DROP TABLE IF EXISTS user_competition_score;
@@ -103,3 +102,49 @@ UPDATE user_competition_score s
     JOIN teacher_competition_record r ON s.record_id = r.id
 SET s.type_name = r.type_name
 WHERE s.type_name = '教师获奖';
+
+-- ===================== 指导学生科技竞赛记录表（v3） =====================
+DROP TABLE IF EXISTS student_competition_record;
+CREATE TABLE IF NOT EXISTS student_competition_record
+(
+    id                   BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name            VARCHAR(64)   DEFAULT '指导学生科技竞赛' NOT NULL COMMENT '记录类型名称',
+    user_id              BIGINT                                NOT NULL COMMENT '填报用户ID',
+    competition_name     VARCHAR(256)                          NOT NULL COMMENT '竞赛名称',
+    sponsor_unit         VARCHAR(512)                          NULL COMMENT '主办单位',
+    competition_topic    VARCHAR(512)                          NULL COMMENT '参赛题目/赛道（组织者行填"组织者"）',
+    student_names        VARCHAR(1024)                         NULL COMMENT '参赛队员姓名',
+    competition_rank     VARCHAR(32)                           NOT NULL COMMENT '竞赛等级：院级/校级/区级/自治区级/国家级/行业性全国/行业性省级',
+    grade_name           VARCHAR(32)                           NOT NULL COMMENT '获奖等级：一等奖/二等奖/三等奖/优秀奖/未获奖/奖项未出',
+    award_level_text     VARCHAR(512)                          NULL COMMENT '完整获奖级别文本（如"国赛二等奖、省赛一等奖"）',
+    is_organizer         TINYINT      DEFAULT 0                NOT NULL COMMENT '是否为组织者行：0-指导者行，1-组织者行',
+    advisor_score_data   TEXT                                  NULL COMMENT '指导老师得分JSON数组',
+    proof_image_data     LONGTEXT                              NULL COMMENT '参赛/获奖证明图片（base64数据）',
+    create_time          DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time          DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete            TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_competition_name (competition_name)
+) COMMENT '指导学生科技竞赛记录' COLLATE utf8mb4_unicode_ci;
+
+
+-- ===================== 指导老师得分明细表（v3） =====================
+DROP TABLE IF EXISTS advisor_score;
+CREATE TABLE IF NOT EXISTS advisor_score
+(
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id       BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id         BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name    VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    base_score      DECIMAL(6,3) NOT NULL COMMENT '基础分（组织者/指导者基础分）',
+    bonus_score     DECIMAL(6,3) NOT NULL COMMENT '获奖加分',
+    total_score     DECIMAL(6,3) NOT NULL COMMENT '总得分 = baseScore + bonusScore',
+    is_leader       TINYINT DEFAULT 0 NOT NULL COMMENT '是否主持者：1是0否',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete       TINYINT DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '指导老师得分明细' COLLATE utf8mb4_unicode_ci;
