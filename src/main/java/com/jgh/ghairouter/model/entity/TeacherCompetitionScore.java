@@ -37,6 +37,12 @@ public class TeacherCompetitionScore implements Serializable {
     @Column("user_id")
     private Long teacherUserId;
 
+    /**
+     * 比赛分类（如"教师获奖"），冗余字段方便统计查询
+     */
+    @Column("type_name")
+    private String typeName;
+
     @Column("personal_score")
     private BigDecimal personalScore;
 
