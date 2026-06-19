@@ -413,27 +413,30 @@ public class StudentCompetitionRecordServiceImpl
                 StudentCompetitionRecordVO vo = getRecordVO(record);
                 if (vo == null) continue;
 
+                int currentRow = rowIdx;
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
                 row.createCell(0).setCellValue(seq++);
                 row.createCell(1).setCellValue(vo.getCompetitionName() != null ? vo.getCompetitionName() : "");
                 row.createCell(2).setCellValue(vo.getSponsorUnit() != null ? vo.getSponsorUnit() : "");
-                row.createCell(3).setCellValue(vo.getCompetitionTopic() != null ? vo.getCompetitionTopic() : "");
 
-                // 参赛队员姓名：组织者行显示"姓名（分数）"，指导者行显示学生姓名
-                String studentNameCol;
-                String advisorCol;
                 if (vo.getIsOrganizer() != null && vo.getIsOrganizer() == 1) {
-                    studentNameCol = formatOrganizerStudentName(vo);
-                    advisorCol = "";
-                } else {
-                    studentNameCol = vo.getStudentNames() != null ? vo.getStudentNames() : "";
-                    advisorCol = formatAdvisorScores(vo);
-                }
-                row.createCell(4).setCellValue(studentNameCol);
-                row.createCell(5).setCellValue(advisorCol);
+                    // 组织者行：参赛题目+参赛队员姓名 合并显示"组织者"
+                    row.createCell(3).setCellValue("组织者");
+                    row.createCell(4).setCellValue("");
+                    // 组织者行：指导老师+获奖级别 合并显示组织者姓名（分数）
+                    row.createCell(5).setCellValue(formatOrganizerStudentName(vo));
+                    row.createCell(6).setCellValue("");
 
-                row.createCell(6).setCellValue(vo.getAwardLevelText() != null ? vo.getAwardLevelText() :
-                        (vo.getGradeName() != null ? vo.getGradeName() : ""));
+                    sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(currentRow, currentRow, 3, 4));
+                    sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(currentRow, currentRow, 5, 6));
+                } else {
+                    // 指导者行
+                    row.createCell(3).setCellValue(vo.getCompetitionTopic() != null ? vo.getCompetitionTopic() : "");
+                    row.createCell(4).setCellValue(vo.getStudentNames() != null ? vo.getStudentNames() : "");
+                    row.createCell(5).setCellValue(formatAdvisorScores(vo));
+                    row.createCell(6).setCellValue(vo.getAwardLevelText() != null ? vo.getAwardLevelText() :
+                            (vo.getGradeName() != null ? vo.getGradeName() : ""));
+                }
             }
 
             for (int i = 0; i < headers.length; i++) {
