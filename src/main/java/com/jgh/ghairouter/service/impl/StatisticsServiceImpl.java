@@ -24,7 +24,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private JdbcTemplate jdbcTemplate;
 
     /**
-     * 教师获奖总分（teacher_competition_score 表，负责人 +2 基础分）
+     * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
      */
     private static final String TEACHER_SCORE_SQL = """
             SELECT
@@ -34,7 +34,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 tcs.personal_score + CASE WHEN tcs.is_leader = 1 THEN 2 ELSE 0 END
               ), 0) AS total_score
             FROM user u
-            INNER JOIN teacher_competition_score tcs ON u.id = tcs.user_id AND tcs.is_delete = 0
+            INNER JOIN user_competition_score tcs ON u.id = tcs.user_id AND tcs.is_delete = 0
             WHERE u.is_delete = 0
             GROUP BY u.id, u.user_name
             """;
@@ -54,7 +54,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     /**
-     * 所有比赛总分（teacher_competition_score + advisor_score 合并）
+     * 所有比赛总分（user_competition_score + advisor_score 合并）
      */
     private static final String ALL_SCORE_SQL = """
             SELECT
@@ -66,7 +66,7 @@ public class StatisticsServiceImpl implements StatisticsService {
               SELECT
                 user_id,
                 SUM(personal_score + CASE WHEN is_leader = 1 THEN 2 ELSE 0 END) AS teacher_score
-              FROM teacher_competition_score
+              FROM user_competition_score
               WHERE is_delete = 0
               GROUP BY user_id
             ) tcs ON u.id = tcs.user_id
@@ -83,7 +83,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     @Override
-    public List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder) {
+    public List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder, String userName) {
         String sql;
         if ("teacher".equals(type)) {
             sql = TEACHER_SCORE_SQL;
@@ -94,10 +94,26 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = ALL_SCORE_SQL;
         }
 
+        // 参数列表（用于模糊查询用户名）
+        List<Object> params = new ArrayList<>();
+
+        // 如果指定了用户名，在 WHERE 条件后追加模糊匹配
+        if (userName != null && !userName.isBlank()) {
+            sql = sql.replace("WHERE u.is_delete = 0",
+                    "WHERE u.is_delete = 0 AND u.user_name LIKE ?");
+            params.add("%" + userName.trim() + "%");
+        }
+
         boolean asc = "ascend".equals(sortOrder);
         sql += " ORDER BY total_score " + (asc ? "ASC" : "DESC");
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+        List<Map<String, Object>> rows;
+        if (params.isEmpty()) {
+            rows = jdbcTemplate.queryForList(sql);
+        } else {
+            rows = jdbcTemplate.queryForList(sql, params.toArray());
+        }
+
         List<UserScoreStatisticsVO> result = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             result.add(UserScoreStatisticsVO.builder()

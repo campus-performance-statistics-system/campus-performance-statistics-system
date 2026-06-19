@@ -8,16 +8,16 @@ use campus_performance_statistics_system;
 create table if not exists user
 (
     id           bigint auto_increment comment 'id' primary key,
-    userAccount  varchar(256)                           not null comment '账号',
-    userPassword varchar(512)                           not null comment '密码',
-    userName     varchar(256)                           null comment '用户昵称',
-    userRole     varchar(256) default 'user'            not null comment '用户角色：user/admin',
-    editTime     datetime     default CURRENT_TIMESTAMP not null comment '编辑时间',
-    createTime   datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
-    updateTime   datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    isDelete     tinyint      default 0                 not null comment '是否删除',
-    UNIQUE KEY uk_userAccount (userAccount),
-    INDEX idx_userName (userName)
+    user_account varchar(256)                           not null comment '账号',
+    user_password varchar(512)                           not null comment '密码',
+    user_name     varchar(256)                           null comment '用户昵称',
+    user_role     varchar(256) default 'user'            not null comment '用户角色：user/admin',
+    edit_time     datetime     default CURRENT_TIMESTAMP not null comment '编辑时间',
+    create_time   datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
+    update_time   datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete     tinyint      default 0                 not null comment '是否删除',
+    UNIQUE KEY uk_user_account (user_account),
+    INDEX idx_user_name (user_name)
 ) comment '用户' collate = utf8mb4_unicode_ci;
 
 -- 密码是 12345678(MD5 加密 + 盐值 yupi)

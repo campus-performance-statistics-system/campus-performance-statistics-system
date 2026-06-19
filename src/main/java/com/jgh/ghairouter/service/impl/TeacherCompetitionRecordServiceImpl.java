@@ -11,9 +11,12 @@ import com.jgh.ghairouter.mapper.*;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.*;
 import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
+import com.jgh.ghairouter.model.vo.AdvisorScoreVO;
 import com.jgh.ghairouter.model.vo.CompetitionRecordVO;
+import com.jgh.ghairouter.model.vo.StudentCompetitionRecordVO;
 import com.jgh.ghairouter.model.vo.TeacherScoreVO;
 import com.jgh.ghairouter.service.AiReviewService;
+import com.jgh.ghairouter.service.StudentCompetitionRecordService;
 import com.jgh.ghairouter.service.TeacherCompetitionRecordService;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -55,6 +58,8 @@ public class TeacherCompetitionRecordServiceImpl
     private TeacherCompetitionAuditRecordMapper auditMapper;
     @Resource
     private TeacherCompetitionScoreMapper teacherScoreMapper;
+    @Resource
+    private StudentCompetitionRecordService studentCompetitionRecordService;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -543,23 +548,16 @@ public class TeacherCompetitionRecordServiceImpl
     public byte[] exportRecordsToExcel() {
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
-            String[] headers = {"序号", "竞赛名称", "颁奖单位", "获奖级别", "等级", "获奖教师及得分"};
 
-            int typeIndex = 0;
-            for (String typeName : EXPORT_TYPE_NAMES) {
-                typeIndex++;
-                List<TeacherCompetitionRecord> typeRecords = this.list(
-                        QueryWrapper.create()
-                                .eq("type_name", typeName)
-                                .orderBy("create_time", true));
+            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
 
-                String sheetName = typeIndex + "-" + typeName;
-                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet(sheetName);
-
-                org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
-                org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-                headerFont.setBold(true);
-                headerStyle.setFont(headerFont);
+            // ========== Sheet 1：教师获奖 ==========
+            {
+                String[] headers = {"序号", "竞赛名称", "颁奖单位", "获奖级别", "等级", "获奖教师及得分"};
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("1-教师获奖");
 
                 org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
                 for (int i = 0; i < headers.length; i++) {
@@ -570,30 +568,110 @@ public class TeacherCompetitionRecordServiceImpl
 
                 int rowIdx = 1;
                 int seq = 1;
-                for (TeacherCompetitionRecord record : typeRecords) {
-                    CompetitionRecordVO vo = getRecordVO(record);
+                for (String typeName : EXPORT_TYPE_NAMES) {
+                    List<TeacherCompetitionRecord> typeRecords = this.list(
+                            QueryWrapper.create()
+                                    .eq("type_name", typeName)
+                                    .orderBy("create_time", true));
+                    for (TeacherCompetitionRecord record : typeRecords) {
+                        CompetitionRecordVO vo = getRecordVO(record);
+                        if (vo == null) continue;
+
+                        org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                        row.createCell(0).setCellValue(seq++);
+                        row.createCell(1).setCellValue(vo.getCompetitionName() != null ? vo.getCompetitionName() : "");
+                        row.createCell(2).setCellValue(vo.getSponsorUnit() != null ? vo.getSponsorUnit() : "");
+                        row.createCell(3).setCellValue(vo.getCompetitionRank() != null ? vo.getCompetitionRank() : "");
+                        row.createCell(4).setCellValue(vo.getGradeName() != null ? vo.getGradeName() : "");
+
+                        StringBuilder sb = new StringBuilder();
+                        if (vo.getTeacherScores() != null && !vo.getTeacherScores().isEmpty()) {
+                            for (int i = 0; i < vo.getTeacherScores().size(); i++) {
+                                if (i > 0) sb.append("、");
+                                TeacherScoreVO ts = vo.getTeacherScores().get(i);
+                                sb.append(ts.getUserName()).append("（")
+                                        .append(ts.getPersonalScore().stripTrailingZeros().toPlainString())
+                                        .append("）");
+                            }
+                        }
+                        row.createCell(5).setCellValue(sb.toString());
+                    }
+                }
+                for (int i = 0; i < headers.length; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+            }
+
+            // ========== Sheet 2：指导学生科技竞赛 ==========
+            {
+                String[] headers = {"序号", "竞赛名称", "主办单位", "参赛题目", "参赛队员姓名", "指导老师", "获奖级别"};
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("2-指导学生科技竞赛");
+
+                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+                for (int i = 0; i < headers.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<StudentCompetitionRecord> allRecords = studentCompetitionRecordService.list(
+                        com.mybatisflex.core.query.QueryWrapper.create()
+                                .orderBy("competition_name", true)
+                                .orderBy("create_time", true));
+
+                int rowIdx = 1;
+                int seq = 1;
+                for (StudentCompetitionRecord record : allRecords) {
+                    StudentCompetitionRecordVO vo = studentCompetitionRecordService.getRecordVO(record);
                     if (vo == null) continue;
 
                     org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
                     row.createCell(0).setCellValue(seq++);
                     row.createCell(1).setCellValue(vo.getCompetitionName() != null ? vo.getCompetitionName() : "");
                     row.createCell(2).setCellValue(vo.getSponsorUnit() != null ? vo.getSponsorUnit() : "");
-                    row.createCell(3).setCellValue(vo.getCompetitionRank() != null ? vo.getCompetitionRank() : "");
-                    row.createCell(4).setCellValue(vo.getGradeName() != null ? vo.getGradeName() : "");
+                    row.createCell(3).setCellValue(vo.getCompetitionTopic() != null ? vo.getCompetitionTopic() : "");
 
-                    StringBuilder sb = new StringBuilder();
-                    if (vo.getTeacherScores() != null && !vo.getTeacherScores().isEmpty()) {
-                        for (int i = 0; i < vo.getTeacherScores().size(); i++) {
-                            if (i > 0) sb.append("、");
-                            TeacherScoreVO ts = vo.getTeacherScores().get(i);
-                            sb.append(ts.getUserName()).append("（")
-                                    .append(ts.getPersonalScore().stripTrailingZeros().toPlainString())
-                                    .append("）");
+                    // 参赛队员姓名：组织者行显示"姓名（分数）"，指导者行显示学生姓名
+                    String studentNameCol;
+                    String advisorCol;
+                    if (vo.getIsOrganizer() != null && vo.getIsOrganizer() == 1) {
+                        studentNameCol = vo.getStudentNames() != null ? vo.getStudentNames() : "";
+                        if (vo.getAdvisorScores() != null && !vo.getAdvisorScores().isEmpty()) {
+                            AdvisorScoreVO score = vo.getAdvisorScores().get(0);
+                            studentNameCol += "（" + score.getTotalScore().stripTrailingZeros().toPlainString() + "）";
                         }
+                        advisorCol = "";
+                    } else {
+                        studentNameCol = vo.getStudentNames() != null ? vo.getStudentNames() : "";
+                        // 格式化指导老师得分
+                        StringBuilder sb = new StringBuilder();
+                        if (vo.getAdvisorScores() != null && !vo.getAdvisorScores().isEmpty()) {
+                            for (int i = 0; i < vo.getAdvisorScores().size(); i++) {
+                                if (i > 0) sb.append("、");
+                                AdvisorScoreVO score = vo.getAdvisorScores().get(i);
+                                sb.append(score.getTeacherName()).append("（");
+                                BigDecimal base = score.getBaseScore();
+                                BigDecimal bonus = score.getBonusScore();
+                                if (base.compareTo(BigDecimal.ZERO) > 0 && bonus.compareTo(BigDecimal.ZERO) > 0) {
+                                    sb.append(base.stripTrailingZeros().toPlainString())
+                                            .append("+奖").append(bonus.stripTrailingZeros().toPlainString());
+                                } else if (bonus.compareTo(BigDecimal.ZERO) > 0) {
+                                    sb.append("奖").append(bonus.stripTrailingZeros().toPlainString());
+                                } else if (base.compareTo(BigDecimal.ZERO) > 0) {
+                                    sb.append(base.stripTrailingZeros().toPlainString());
+                                } else {
+                                    sb.append("0");
+                                }
+                                sb.append("）");
+                            }
+                        }
+                        advisorCol = sb.toString();
                     }
-                    row.createCell(5).setCellValue(sb.toString());
+                    row.createCell(4).setCellValue(studentNameCol);
+                    row.createCell(5).setCellValue(advisorCol);
+                    row.createCell(6).setCellValue(vo.getAwardLevelText() != null ? vo.getAwardLevelText()
+                            : (vo.getGradeName() != null ? vo.getGradeName() : ""));
                 }
-
                 for (int i = 0; i < headers.length; i++) {
                     sheet.autoSizeColumn(i);
                 }

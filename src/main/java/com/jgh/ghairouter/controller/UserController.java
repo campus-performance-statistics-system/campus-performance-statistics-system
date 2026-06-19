@@ -214,7 +214,7 @@ public class UserController {
                                         BatchImportResult result, int rowNum) {
         try {
             long count = userService.count(
-                    QueryWrapper.create().eq("userAccount", userAccount));
+                    QueryWrapper.create().eq("user_account", userAccount));
             if (count > 0) {
                 result.setSkipCount(result.getSkipCount() + 1);
                 return;
@@ -325,7 +325,7 @@ public class UserController {
     public BaseResponse<List<UserVO>> listMembers() {
         List<User> users = userService.list(
                 QueryWrapper.create()
-                        .eq("userRole", UserRoleEnum.USER.getValue())
+                        .eq("user_role", UserRoleEnum.USER.getValue())
                         .orderBy("id", true));
         return ResultUtils.success(userService.getUserVOList(users));
     }

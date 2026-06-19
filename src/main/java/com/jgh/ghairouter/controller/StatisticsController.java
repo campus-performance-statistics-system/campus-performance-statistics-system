@@ -23,10 +23,11 @@ public class StatisticsController {
 
     @GetMapping("/total-scores")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    @Operation(summary = "获取所有用户总得分统计")
+    @Operation(summary = "获取用户总得分统计（可按用户名筛选）")
     public BaseResponse<List<UserScoreStatisticsVO>> getUserScoreStatistics(
             @RequestParam(value = "type", defaultValue = "all") String type,
-            @RequestParam(value = "sortOrder", defaultValue = "descend") String sortOrder) {
-        return ResultUtils.success(statisticsService.getUserScoreStatistics(type, sortOrder));
+            @RequestParam(value = "sortOrder", defaultValue = "descend") String sortOrder,
+            @RequestParam(value = "userName", required = false) String userName) {
+        return ResultUtils.success(statisticsService.getUserScoreStatistics(type, sortOrder, userName));
     }
 }
