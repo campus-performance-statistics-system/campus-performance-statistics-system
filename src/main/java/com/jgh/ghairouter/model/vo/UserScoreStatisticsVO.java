@@ -10,7 +10,8 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
- * 用户得分统计 VO（管理员统计管理页使用）
+ * 用户得分统计 VO（管理员统计管理页使用）。
+ * totalScore 含义取决于查询分类（教师获奖 / 指导学生科技竞赛 / 所有比赛合计）。
  */
 @Data
 @Builder
@@ -27,12 +28,6 @@ public class UserScoreStatisticsVO implements Serializable {
     /** 用户姓名 */
     private String userName;
 
-    /** 教师获奖总得分 */
-    private BigDecimal teacherScore;
-
-    /** 指导学生科技竞赛总得分 */
-    private BigDecimal studentScore;
-
-    /** 总分（教师获奖 + 学生竞赛） */
+    /** 总得分 */
     private BigDecimal totalScore;
 }

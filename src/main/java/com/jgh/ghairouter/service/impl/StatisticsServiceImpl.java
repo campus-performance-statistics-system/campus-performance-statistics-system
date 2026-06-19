@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 统计管理服务实现
+ * 统计管理服务实现。
+ * 根据分类从对应的得分表中汇总用户得分。
  */
 @Slf4j
 @Service
@@ -22,12 +23,43 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Resource
     private JdbcTemplate jdbcTemplate;
 
-    private static final String BASE_SQL = """
+    /**
+     * 教师获奖总分（teacher_competition_score 表，负责人 +2 基础分）
+     */
+    private static final String TEACHER_SCORE_SQL = """
             SELECT
               u.id AS user_id,
               u.user_name,
-              COALESCE(tcs.teacher_score, 0) AS teacher_score,
-              COALESCE(ascore.student_score, 0) AS student_score,
+              COALESCE(SUM(
+                tcs.personal_score + CASE WHEN tcs.is_leader = 1 THEN 2 ELSE 0 END
+              ), 0) AS total_score
+            FROM user u
+            INNER JOIN teacher_competition_score tcs ON u.id = tcs.user_id AND tcs.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 学生科技竞赛总分（advisor_score 表）
+     */
+    private static final String STUDENT_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              COALESCE(SUM(ascore.total_score), 0) AS total_score
+            FROM user u
+            INNER JOIN advisor_score ascore ON u.id = ascore.user_id AND ascore.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 所有比赛总分（teacher_competition_score + advisor_score 合并）
+     */
+    private static final String ALL_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
               COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) AS total_score
             FROM user u
             LEFT JOIN (
@@ -47,38 +79,30 @@ public class StatisticsServiceImpl implements StatisticsService {
               GROUP BY user_id
             ) ascore ON u.id = ascore.user_id
             WHERE u.is_delete = 0
+              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL)
             """;
 
     @Override
     public List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder) {
-        StringBuilder sql = new StringBuilder(BASE_SQL);
-
-        // 按类别筛选
+        String sql;
         if ("teacher".equals(type)) {
-            sql.append(" AND tcs.teacher_score IS NOT NULL AND tcs.teacher_score > 0");
+            sql = TEACHER_SCORE_SQL;
         } else if ("student".equals(type)) {
-            sql.append(" AND ascore.student_score IS NOT NULL AND ascore.student_score > 0");
-        }
-        // "all" 不过滤
-
-        // 排序
-        boolean asc = "ascend".equals(sortOrder);
-        if ("teacher".equals(type)) {
-            sql.append(" ORDER BY teacher_score ").append(asc ? "ASC" : "DESC");
-        } else if ("student".equals(type)) {
-            sql.append(" ORDER BY student_score ").append(asc ? "ASC" : "DESC");
+            sql = STUDENT_SCORE_SQL;
         } else {
-            sql.append(" ORDER BY total_score ").append(asc ? "ASC" : "DESC");
+            // "all" — 合并所有
+            sql = ALL_SCORE_SQL;
         }
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString());
+        boolean asc = "ascend".equals(sortOrder);
+        sql += " ORDER BY total_score " + (asc ? "ASC" : "DESC");
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
         List<UserScoreStatisticsVO> result = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             result.add(UserScoreStatisticsVO.builder()
                     .userId(toLong(row.get("user_id")))
                     .userName((String) row.get("user_name"))
-                    .teacherScore(toBigDecimal(row.get("teacher_score")))
-                    .studentScore(toBigDecimal(row.get("student_score")))
                     .totalScore(toBigDecimal(row.get("total_score")))
                     .build());
         }
