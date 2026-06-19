@@ -18,4 +18,11 @@ public interface StatisticsService {
      * @return 用户得分统计列表
      */
     List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder, String userName);
+
+    /**
+     * 导出所有比赛分类的附件为ZIP压缩包。
+     * ZIP 根目录为"所有附件"，按比赛分类建子文件夹，
+     * 文件名格式：序号-比赛名称-用户姓名.png
+     */
+    byte[] exportAllAttachmentsToZip();
 }
