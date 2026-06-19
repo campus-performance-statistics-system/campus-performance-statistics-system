@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS student_competition_record
     competition_rank     VARCHAR(32)                           NULL COMMENT '竞赛等级：院级/校级/区级/自治区级/国家级/行业性全国/行业性省级',
     grade_name           VARCHAR(32)                           NULL COMMENT '获奖等级：一等奖/二等奖/三等奖/优秀奖/未获奖/奖项未出（组织者行为NULL）',
     award_level_text     VARCHAR(512)                          NULL COMMENT '完整获奖级别文本（如"国赛二等奖、省赛一等奖"）',
+    award_details        TEXT                                  NULL COMMENT '获奖明细JSON数组：[{"rank":"国家级","grade":"二等奖"},{"rank":"自治区级","grade":"一等奖"}]',
     is_organizer         TINYINT      DEFAULT 0                NOT NULL COMMENT '是否为组织者行：0-指导者行，1-组织者行',
     advisor_score_data   TEXT                                  NULL COMMENT '指导老师得分JSON数组',
     proof_image_data     LONGTEXT                              NULL COMMENT '参赛/获奖证明图片（base64数据）',

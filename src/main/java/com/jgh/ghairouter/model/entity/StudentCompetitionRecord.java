@@ -66,6 +66,10 @@ public class StudentCompetitionRecord implements Serializable {
     @Column("award_level_text")
     private String awardLevelText;
 
+    /** 获奖明细JSON数组：[{"rank":"国家级","grade":"二等奖"},{"rank":"自治区级","grade":"一等奖"}] */
+    @Column("award_details")
+    private String awardDetails;
+
     /** 是否为组织者行（组织者独占一行，参赛题目填"组织者"） */
     @Column("is_organizer")
     private Integer isOrganizer;

@@ -22,6 +22,7 @@ public interface StudentCompetitionRecordService extends IService<StudentCompeti
                    String competitionName, String sponsorUnit,
                    String competitionTopic, String studentNames,
                    String competitionRank, String gradeName, String awardLevelText,
+                   String awardDetails,
                    Integer isOrganizer, String advisorScoreData,
                    MultipartFile file);
 

@@ -356,4 +356,40 @@ public final class StudentScoringConstants {
 
         return rules;
     }
+
+    // ==================== 多奖项支持 ====================
+
+    /** 竞赛等级排序值（数值越大级别越高） */
+    private static final Map<String, Integer> RANK_ORDER = Map.of(
+        RANK_COLLEGE, 1,
+        RANK_SCHOOL, 2,
+        RANK_INDUSTRY_PROVINCIAL, 3,
+        RANK_REGIONAL, 4,
+        RANK_PROVINCIAL, 5,
+        RANK_INDUSTRY_NATIONAL, 6,
+        RANK_NATIONAL, 7
+    );
+
+    /** 获奖等级排序值（数值越大等级越高） */
+    private static final Map<String, Integer> GRADE_ORDER = Map.of(
+        GRADE_EXCELLENCE, 1,
+        GRADE_OTHER, 2,
+        GRADE_THIRD, 3,
+        GRADE_SECOND, 4,
+        GRADE_FIRST, 5
+    );
+
+    /**
+     * 获取竞赛等级的排序值
+     */
+    public static int getRankOrder(String rank) {
+        return RANK_ORDER.getOrDefault(rank, 0);
+    }
+
+    /**
+     * 获取获奖等级的排序值
+     */
+    public static int getGradeOrder(String grade) {
+        return GRADE_ORDER.getOrDefault(grade, 0);
+    }
 }

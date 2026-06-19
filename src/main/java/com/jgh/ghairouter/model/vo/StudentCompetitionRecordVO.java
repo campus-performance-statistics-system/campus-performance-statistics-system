@@ -27,6 +27,10 @@ public class StudentCompetitionRecordVO implements Serializable {
     private String competitionRank;
     private String gradeName;
     private String awardLevelText;
+
+    /** 获奖明细JSON数组 */
+    private String awardDetails;
+
     private Integer isOrganizer;
 
     /** 指导老师得分明细 */

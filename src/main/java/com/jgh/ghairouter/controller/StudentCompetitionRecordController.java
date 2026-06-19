@@ -49,6 +49,7 @@ public class StudentCompetitionRecordController {
             @RequestParam(value = "competitionRank", required = false) String competitionRank,
             @RequestParam(value = "gradeName", required = false) String gradeName,
             @RequestParam(value = "awardLevelText", required = false) String awardLevelText,
+            @RequestParam(value = "awardDetails", required = false) String awardDetails,
             @RequestParam(value = "isOrganizer", defaultValue = "0") Integer isOrganizer,
             @RequestParam(value = "advisorScoreData", required = false) String advisorScoreData,
             @RequestParam(value = "file", required = false) MultipartFile file,
@@ -58,7 +59,7 @@ public class StudentCompetitionRecordController {
                 loginUser.getId(),
                 competitionName, sponsorUnit,
                 competitionTopic, studentNames,
-                competitionRank, gradeName, awardLevelText,
+                competitionRank, gradeName, awardLevelText, awardDetails,
                 isOrganizer, advisorScoreData,
                 file);
         return ResultUtils.success(recordId);

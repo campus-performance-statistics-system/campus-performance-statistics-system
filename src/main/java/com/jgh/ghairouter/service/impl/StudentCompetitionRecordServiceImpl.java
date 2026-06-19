@@ -56,6 +56,7 @@ public class StudentCompetitionRecordServiceImpl
                           String competitionName, String sponsorUnit,
                           String competitionTopic, String studentNames,
                           String competitionRank, String gradeName, String awardLevelText,
+                          String awardDetails,
                           Integer isOrganizer, String advisorScoreData,
                           MultipartFile file) {
 
@@ -76,10 +77,19 @@ public class StudentCompetitionRecordServiceImpl
         record.setSponsorUnit(sponsorUnit);
         record.setCompetitionTopic(competitionTopic);
         record.setStudentNames(studentNames);
+
         // 组织者类别时，竞赛等级应填 null
-        record.setCompetitionRank(isOrganizer != null && isOrganizer == 1 ? null : competitionRank);
-        record.setGradeName(gradeName);
+        if (isOrganizer != null && isOrganizer == 1) {
+            record.setCompetitionRank(null);
+            record.setGradeName(null);
+        } else {
+            // 指导者：取最高级别奖项作为 competitionRank / gradeName（用于计分）
+            String[] best = resolveBestAward(awardDetails, competitionRank, gradeName);
+            record.setCompetitionRank(best[0]);
+            record.setGradeName(best[1]);
+        }
         record.setAwardLevelText(awardLevelText);
+        record.setAwardDetails(awardDetails);
         record.setIsOrganizer(isOrganizer != null ? isOrganizer : 0);
         record.setAdvisorScoreData(advisorScoreData);
         record.setProofImageData(base64);
@@ -109,6 +119,43 @@ public class StudentCompetitionRecordServiceImpl
             }
         }
         return record.getId();
+    }
+
+    /**
+     * 从 awardDetails JSON 数组中找出最高级别的奖项。
+     * 返回 [competitionRank, gradeName]。
+     * 若 awardDetails 为空，回退到传入的 competitionRank / gradeName。
+     */
+    private String[] resolveBestAward(String awardDetails, String fallbackRank, String fallbackGrade) {
+        if (StrUtil.isBlank(awardDetails)) {
+            return new String[]{fallbackRank, fallbackGrade};
+        }
+        try {
+            JSONArray arr = new JSONArray(awardDetails);
+            String bestRank = null;
+            String bestGrade = null;
+            int bestRankOrder = -1;
+            int bestGradeOrder = -1;
+            for (int i = 0; i < arr.size(); i++) {
+                JSONObject entry = arr.getJSONObject(i);
+                String rank = entry.getStr("rank");
+                String grade = entry.getStr("grade");
+                int rankOrder = StudentScoringConstants.getRankOrder(rank);
+                int gradeOrder = StudentScoringConstants.getGradeOrder(grade);
+                if (rankOrder > bestRankOrder || (rankOrder == bestRankOrder && gradeOrder > bestGradeOrder)) {
+                    bestRank = rank;
+                    bestGrade = grade;
+                    bestRankOrder = rankOrder;
+                    bestGradeOrder = gradeOrder;
+                }
+            }
+            if (bestRank != null) {
+                return new String[]{bestRank, bestGrade};
+            }
+        } catch (Exception e) {
+            log.warn("解析 awardDetails 失败: {}", awardDetails, e);
+        }
+        return new String[]{fallbackRank, fallbackGrade};
     }
 
     // ==================== 保存得分明细 ====================
