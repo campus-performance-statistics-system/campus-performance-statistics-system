@@ -21,7 +21,7 @@ create table if not exists user
 ) comment '用户' collate = utf8mb4_unicode_ci;
 
 -- 密码是 12345678(MD5 加密 + 盐值 yupi)
-INSERT INTO user (id, userAccount, userPassword, userName,  userRole) VALUES
+INSERT INTO user (id, user_account, user_password, user_name,  user_role) VALUES
 (1, 'admin', '10670d38ec32fa8102be6a37f8cb52bf', '管理员',  'admin'),
 (2, 'user', '10670d38ec32fa8102be6a37f8cb52bf', '普通用户', 'user');
 
@@ -149,3 +149,41 @@ CREATE TABLE IF NOT EXISTS advisor_score
     INDEX idx_user_id (user_id),
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '指导老师得分明细' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 指导实训记录表（v4） =====================
+DROP TABLE IF EXISTS training_guidance_record;
+CREATE TABLE IF NOT EXISTS training_guidance_record
+(
+    id                     BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name              VARCHAR(64)   DEFAULT '指导实训'       NOT NULL COMMENT '记录类型名称',
+    user_id                BIGINT                                NOT NULL COMMENT '填报用户ID',
+    semester               VARCHAR(64)                           NOT NULL COMMENT '学期',
+    training_name          VARCHAR(256)                          NOT NULL COMMENT '实训名称',
+    responsible_teachers   TEXT                                  NULL COMMENT '负责教师JSON数组：[{"teacherName":"秦小旭"},...]',
+    participating_teachers TEXT                                  NULL COMMENT '参与教师JSON数组：[{"teacherName":"李志平"},...]',
+    proof_image_data       LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time            DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time            DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete              TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_training_name (training_name)
+) COMMENT '指导实训记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 指导实训得分明细表（v4） =====================
+DROP TABLE IF EXISTS training_guidance_score;
+CREATE TABLE IF NOT EXISTS training_guidance_score
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id    BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id      BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score        DECIMAL(6,3) NOT NULL COMMENT '得分（负责教师2分，参与教师1分）',
+    role_type    VARCHAR(32)  NOT NULL COMMENT '角色类型：responsible-负责教师, participating-参与教师',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete    TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '指导实训得分明细' COLLATE utf8mb4_unicode_ci;

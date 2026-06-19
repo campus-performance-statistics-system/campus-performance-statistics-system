@@ -18,6 +18,7 @@ import com.jgh.ghairouter.model.vo.TeacherScoreVO;
 import com.jgh.ghairouter.service.AiReviewService;
 import com.jgh.ghairouter.service.StudentCompetitionRecordService;
 import com.jgh.ghairouter.service.TeacherCompetitionRecordService;
+import com.jgh.ghairouter.service.TrainingGuidanceRecordService;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -60,6 +61,8 @@ public class TeacherCompetitionRecordServiceImpl
     private TeacherCompetitionScoreMapper teacherScoreMapper;
     @Resource
     private StudentCompetitionRecordService studentCompetitionRecordService;
+    @Resource
+    private TrainingGuidanceRecordService trainingGuidanceRecordService;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -677,6 +680,42 @@ public class TeacherCompetitionRecordServiceImpl
                 }
             }
 
+            // ========== Sheet 3：指导实训 ==========
+            {
+                String[] headers = {"序号", "时间", "实训名称", "负责教师", "参与教师"};
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("3-指导实训");
+
+                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+                for (int i = 0; i < headers.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<TrainingGuidanceRecord> trainingRecords = trainingGuidanceRecordService.list(
+                        com.mybatisflex.core.query.QueryWrapper.create()
+                                .orderBy("semester", true)
+                                .orderBy("create_time", true));
+
+                int rowIdx = 1;
+                int seq = 1;
+                for (TrainingGuidanceRecord record : trainingRecords) {
+                    com.jgh.ghairouter.model.vo.TrainingGuidanceRecordVO vo =
+                            trainingGuidanceRecordService.getRecordVO(record);
+                    if (vo == null) continue;
+
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(seq++);
+                    row.createCell(1).setCellValue(record.getSemester() != null ? record.getSemester() : "");
+                    row.createCell(2).setCellValue(record.getTrainingName() != null ? record.getTrainingName() : "");
+                    row.createCell(3).setCellValue(formatTrainingTeachers(record.getResponsibleTeachers(), "2"));
+                    row.createCell(4).setCellValue(formatTrainingTeachers(record.getParticipatingTeachers(), "1"));
+                }
+                for (int i = 0; i < headers.length; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+            }
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -752,5 +791,27 @@ public class TeacherCompetitionRecordServiceImpl
     private String sanitizeFilename(String name) {
         if (StrUtil.isBlank(name)) return "未知";
         return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    }
+
+    /**
+     * 格式化指导实训教师姓名（用于导出Excel）
+     * 例如：[{"teacherName":"秦小旭"},{"teacherName":"方锦文"}] → "秦小旭（2）、方锦文（2）"
+     */
+    private String formatTrainingTeachers(String teacherJson, String scoreStr) {
+        if (StrUtil.isBlank(teacherJson)) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(teacherJson);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.size(); i++) {
+                if (i > 0) sb.append("、");
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                sb.append(name).append("（").append(scoreStr).append("）");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("解析教师JSON失败: {}", teacherJson, e);
+            return teacherJson;
+        }
     }
 }

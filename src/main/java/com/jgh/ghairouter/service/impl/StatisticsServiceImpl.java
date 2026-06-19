@@ -5,9 +5,11 @@ import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TeacherCompetitionRecordMapper;
+import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.StudentCompetitionRecord;
 import com.jgh.ghairouter.model.entity.TeacherCompetitionRecord;
+import com.jgh.ghairouter.model.entity.TrainingGuidanceRecord;
 import com.jgh.ghairouter.model.entity.User;
 import com.jgh.ghairouter.model.vo.UserScoreStatisticsVO;
 import com.jgh.ghairouter.service.StatisticsService;
@@ -39,6 +41,9 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private StudentCompetitionRecordMapper studentRecordMapper;
+
+    @Resource
+    private TrainingGuidanceRecordMapper trainingRecordMapper;
 
     @Resource
     private UserMapper userMapper;
@@ -74,13 +79,27 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     /**
-     * 所有比赛总分（user_competition_score + advisor_score 合并）
+     * 指导实训总分（training_guidance_score 表）
+     */
+    private static final String TRAINING_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              COALESCE(SUM(tscore.score), 0) AS total_score
+            FROM user u
+            INNER JOIN training_guidance_score tscore ON u.id = tscore.user_id AND tscore.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 所有比赛总分（user_competition_score + advisor_score + training_guidance_score 合并）
      */
     private static final String ALL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
               u.user_name,
-              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) AS total_score
+              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) AS total_score
             FROM user u
             LEFT JOIN (
               SELECT
@@ -98,8 +117,16 @@ public class StatisticsServiceImpl implements StatisticsService {
               WHERE is_delete = 0
               GROUP BY user_id
             ) ascore ON u.id = ascore.user_id
+            LEFT JOIN (
+              SELECT
+                user_id,
+                SUM(score) AS training_score
+              FROM training_guidance_score
+              WHERE is_delete = 0
+              GROUP BY user_id
+            ) tscore ON u.id = tscore.user_id
             WHERE u.is_delete = 0
-              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL)
+              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL)
             """;
 
     @Override
@@ -109,6 +136,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = TEACHER_SCORE_SQL;
         } else if ("student".equals(type)) {
             sql = STUDENT_SCORE_SQL;
+        } else if ("training".equals(type)) {
+            sql = TRAINING_SCORE_SQL;
         } else {
             // "all" — 合并所有
             sql = ALL_SCORE_SQL;
@@ -193,6 +222,33 @@ public class StatisticsServiceImpl implements StatisticsService {
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + competitionName + topic + "-" + userName + ".png";
                 String zipPath = "所有附件/指导学生科技竞赛/" + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 指导实训 ----
+            List<TrainingGuidanceRecord> trainingRecords = trainingRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (TrainingGuidanceRecord record : trainingRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String trainingName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getTrainingName())
+                                ? record.getTrainingName() : "未知实训");
+                String semester = StrUtil.isNotBlank(record.getSemester())
+                        ? "-" + sanitizeFilename(record.getSemester()) : "";
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + trainingName + semester + "-" + userName + ".png";
+                String zipPath = "所有附件/指导实训/" + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
