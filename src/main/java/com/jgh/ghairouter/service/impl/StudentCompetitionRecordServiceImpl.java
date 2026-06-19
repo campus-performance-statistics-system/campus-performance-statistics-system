@@ -76,7 +76,8 @@ public class StudentCompetitionRecordServiceImpl
         record.setSponsorUnit(sponsorUnit);
         record.setCompetitionTopic(competitionTopic);
         record.setStudentNames(studentNames);
-        record.setCompetitionRank(competitionRank);
+        // 组织者类别时，竞赛等级应填 null
+        record.setCompetitionRank(isOrganizer != null && isOrganizer == 1 ? null : competitionRank);
         record.setGradeName(gradeName);
         record.setAwardLevelText(awardLevelText);
         record.setIsOrganizer(isOrganizer != null ? isOrganizer : 0);
@@ -129,6 +130,15 @@ public class StudentCompetitionRecordServiceImpl
                 }
                 String teacherName = entry.getStr("teacherName");
                 score.setTeacherName(teacherName);
+
+                // 如果前端没传 userId，尝试按姓名反查用户ID（组织者行通常只传姓名）
+                if (score.getTeacherUserId() == null && StrUtil.isNotBlank(teacherName)) {
+                    User teacher = userMapper.selectOneByQuery(
+                            QueryWrapper.create().eq("user_name", teacherName));
+                    if (teacher != null) {
+                        score.setTeacherUserId(teacher.getId());
+                    }
+                }
 
                 BigDecimal baseScore = entry.getBigDecimal("baseScore");
                 BigDecimal bonusScore = entry.getBigDecimal("bonusScore");
