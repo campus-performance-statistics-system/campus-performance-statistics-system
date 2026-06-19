@@ -188,8 +188,10 @@ public class StatisticsServiceImpl implements StatisticsService {
                 String competitionName = sanitizeFilename(
                         StrUtil.isNotBlank(record.getCompetitionName())
                                 ? record.getCompetitionName() : "未知比赛");
+                String topic = StrUtil.isNotBlank(record.getCompetitionTopic())
+                        ? "-" + sanitizeFilename(record.getCompetitionTopic()) : "";
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
-                String fileName = seq + "-" + competitionName + "-" + userName + ".png";
+                String fileName = seq + "-" + competitionName + topic + "-" + userName + ".png";
                 String zipPath = "所有附件/指导学生科技竞赛/" + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
