@@ -83,8 +83,8 @@ public class AiReviewServiceImpl implements AiReviewService {
 
     @Async
     @Override
-    public void autoReview(Long recordId, String competitionName, String imageBase64, String mimeType) {
-        log.info("开始自动审核记录: recordId={}, competitionName={}", recordId, competitionName);
+    public void autoReview(Long recordId, String recordType, String competitionName, String imageBase64, String mimeType) {
+        log.info("开始自动审核记录: recordId={}, recordType={}, competitionName={}", recordId, recordType, competitionName);
 
         String comment;
         String status;
@@ -125,12 +125,12 @@ public class AiReviewServiceImpl implements AiReviewService {
             comment = "AI自动审核服务异常: " + e.getMessage();
         }
 
-        updateReviewResult(recordId, status, comment);
+        updateReviewResult(recordId, recordType, status, comment);
     }
 
-    private void updateReviewResult(Long recordId, String status, String comment) {
+    private void updateReviewResult(Long recordId, String recordType, String status, String comment) {
         TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
-                QueryWrapper.create().eq("record_id", recordId));
+                QueryWrapper.create().eq("record_id", recordId).eq("record_type", recordType));
         if (audit != null) {
             audit.setAutoReviewStatus(status);
             audit.setAutoReviewComment(comment);

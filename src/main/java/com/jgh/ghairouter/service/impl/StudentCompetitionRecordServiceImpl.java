@@ -113,7 +113,7 @@ public class StudentCompetitionRecordServiceImpl
             String mimeType = file.getContentType();
             if (StrUtil.isBlank(mimeType)) mimeType = "image/png";
             try {
-                aiReviewService.autoReview(record.getId(), competitionName, base64, mimeType);
+                aiReviewService.autoReview(record.getId(), record.getTypeName(), competitionName, base64, mimeType);
             } catch (Exception e) {
                 log.error("AI审核触发失败", e);
             }
@@ -237,9 +237,9 @@ public class StudentCompetitionRecordServiceImpl
             if (u != null) vo.setUserName(u.getUserName());
         }
 
-        // 审核信息
+        // 审核信息（按 record_id + record_type 联合定位）
         TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
-                QueryWrapper.create().eq("record_id", record.getId()));
+                QueryWrapper.create().eq("record_id", record.getId()).eq("record_type", record.getTypeName()));
         if (audit != null) {
             vo.setAutoReviewStatus(audit.getAutoReviewStatus());
             vo.setAutoReviewComment(audit.getAutoReviewComment());
@@ -352,7 +352,7 @@ public class StudentCompetitionRecordServiceImpl
         if (record == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "比赛记录不存在");
 
         TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
-                QueryWrapper.create().eq("record_id", recordId));
+                QueryWrapper.create().eq("record_id", recordId).eq("record_type", record.getTypeName()));
         if (audit == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "审核记录不存在");
 
         if (statusEnum == ReviewStatusEnum.PASSED && StrUtil.isBlank(reviewComment))

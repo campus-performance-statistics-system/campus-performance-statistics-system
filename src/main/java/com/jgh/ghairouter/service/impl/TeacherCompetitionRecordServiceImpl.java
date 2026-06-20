@@ -8,6 +8,7 @@ import cn.hutool.json.JSONObject;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.*;
+import com.jgh.ghairouter.model.constants.ResearchScoringConstants;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.*;
 import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
@@ -63,6 +64,10 @@ public class TeacherCompetitionRecordServiceImpl
     private StudentCompetitionRecordService studentCompetitionRecordService;
     @Resource
     private TrainingGuidanceRecordService trainingGuidanceRecordService;
+    @Resource
+    private ResearchAchievementRecordMapper researchRecordMapper;
+    @Resource
+    private ResearchAchievementScoreMapper researchScoreMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -138,7 +143,7 @@ public class TeacherCompetitionRecordServiceImpl
             String mimeType = file.getContentType();
             if (StrUtil.isBlank(mimeType)) mimeType = "image/png";
             try {
-                aiReviewService.autoReview(record.getId(), competitionName, base64, mimeType);
+                aiReviewService.autoReview(record.getId(), record.getTypeName(), competitionName, base64, mimeType);
             } catch (Exception e) {
                 log.error("AI审核触发失败", e);
             }
@@ -363,9 +368,9 @@ public class TeacherCompetitionRecordServiceImpl
             vo.setOtherAuthorNames(String.join("、", names));
         }
 
-        // 从审计表获取审核信息
+        // 从审计表获取审核信息（按 record_id + record_type 联合定位）
         TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
-                QueryWrapper.create().eq("record_id", record.getId()));
+                QueryWrapper.create().eq("record_id", record.getId()).eq("record_type", record.getTypeName()));
         if (audit != null) {
             vo.setAutoReviewStatus(audit.getAutoReviewStatus());
             vo.setAutoReviewComment(audit.getAutoReviewComment());
@@ -493,7 +498,7 @@ public class TeacherCompetitionRecordServiceImpl
         if (record == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "比赛记录不存在");
 
         TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
-                QueryWrapper.create().eq("record_id", recordId));
+                QueryWrapper.create().eq("record_id", recordId).eq("record_type", record.getTypeName()));
         if (audit == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "审核记录不存在");
 
         if (statusEnum == ReviewStatusEnum.PASSED && StrUtil.isBlank(reviewComment))
@@ -716,6 +721,119 @@ public class TeacherCompetitionRecordServiceImpl
                 }
             }
 
+            // ========== Sheet 4：横向科研项目及专利教材业绩（合并） ==========
+            {
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("4-横向科研项目及专利教材业绩");
+
+                // 章节标题样式
+                org.apache.poi.ss.usermodel.CellStyle sectionStyle = workbook.createCellStyle();
+                sectionStyle.setFont(headerFont);
+                sectionStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+                sectionStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+
+                int colCount = 6;
+                int rowIdx = 0;
+
+                // ---- 横向科研项目 ----
+                org.apache.poi.ss.usermodel.Row sectionTitle1 = sheet.createRow(rowIdx++);
+                org.apache.poi.ss.usermodel.Cell titleCell1 = sectionTitle1.createCell(0);
+                titleCell1.setCellValue("横向科研项目");
+                titleCell1.setCellStyle(sectionStyle);
+                sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, colCount - 1));
+
+                String[] hHeaders = {"序号", "项目名称", "项目来源", "到位经费(万元)", "项目组成员及得分", "业绩分"};
+                org.apache.poi.ss.usermodel.Row hHeaderRow = sheet.createRow(rowIdx++);
+                for (int i = 0; i < hHeaders.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = hHeaderRow.createCell(i);
+                    cell.setCellValue(hHeaders[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<ResearchAchievementRecord> hRecords = researchRecordMapper.selectListByQuery(
+                        QueryWrapper.create().eq("sub_type", ResearchScoringConstants.SUB_TYPE_HORIZONTAL_PROJECT)
+                                .orderBy("create_time", true));
+                int seq = 1;
+                for (ResearchAchievementRecord record : hRecords) {
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(seq++);
+                    row.createCell(1).setCellValue(record.getAchievementName() != null ? record.getAchievementName() : "");
+                    row.createCell(2).setCellValue(record.getProjectSource() != null ? record.getProjectSource() : "");
+                    row.createCell(3).setCellValue(record.getFundingAmount() != null
+                            ? record.getFundingAmount().stripTrailingZeros().toPlainString() : "0");
+                    row.createCell(4).setCellValue(formatResearchMemberNames(record.getMemberData()));
+                    row.createCell(5).setCellValue(formatResearchScoreTotal(record.getId()));
+                }
+
+                // 空两行
+                rowIdx += 2;
+
+                // ---- 专利 ----
+                org.apache.poi.ss.usermodel.Row sectionTitle2 = sheet.createRow(rowIdx++);
+                org.apache.poi.ss.usermodel.Cell titleCell2 = sectionTitle2.createCell(0);
+                titleCell2.setCellValue("专利");
+                titleCell2.setCellStyle(sectionStyle);
+                sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, colCount - 1));
+
+                String[] pHeaders = {"序号", "专利名称", "专利号", "专利类别", "发明成员及得分", "业绩分"};
+                org.apache.poi.ss.usermodel.Row pHeaderRow = sheet.createRow(rowIdx++);
+                for (int i = 0; i < pHeaders.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = pHeaderRow.createCell(i);
+                    cell.setCellValue(pHeaders[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<ResearchAchievementRecord> pRecords = researchRecordMapper.selectListByQuery(
+                        QueryWrapper.create().eq("sub_type", ResearchScoringConstants.SUB_TYPE_PATENT)
+                                .orderBy("create_time", true));
+                seq = 1;
+                for (ResearchAchievementRecord record : pRecords) {
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(seq++);
+                    row.createCell(1).setCellValue(record.getAchievementName() != null ? record.getAchievementName() : "");
+                    row.createCell(2).setCellValue(record.getPatentNumber() != null ? record.getPatentNumber() : "");
+                    row.createCell(3).setCellValue(ResearchScoringConstants.getPatentTypeText(record.getPatentType()));
+                    row.createCell(4).setCellValue(formatResearchMemberNames(record.getMemberData()));
+                    row.createCell(5).setCellValue(formatResearchScoreTotal(record.getId()));
+                }
+
+                // 空两行
+                rowIdx += 2;
+
+                // ---- 教材及自编讲义 ----
+                org.apache.poi.ss.usermodel.Row sectionTitle3 = sheet.createRow(rowIdx++);
+                org.apache.poi.ss.usermodel.Cell titleCell3 = sectionTitle3.createCell(0);
+                titleCell3.setCellValue("教材及自编讲义");
+                titleCell3.setCellStyle(sectionStyle);
+                sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, colCount - 1));
+
+                String[] tHeaders = {"序号", "教材及自编讲义名称", "字数(万)", "教材类型", "参编人员及得分", "业绩分"};
+                org.apache.poi.ss.usermodel.Row tHeaderRow = sheet.createRow(rowIdx++);
+                for (int i = 0; i < tHeaders.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = tHeaderRow.createCell(i);
+                    cell.setCellValue(tHeaders[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<ResearchAchievementRecord> tRecords = researchRecordMapper.selectListByQuery(
+                        QueryWrapper.create().eq("sub_type", ResearchScoringConstants.SUB_TYPE_TEXTBOOK)
+                                .orderBy("create_time", true));
+                seq = 1;
+                for (ResearchAchievementRecord record : tRecords) {
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(seq++);
+                    row.createCell(1).setCellValue(record.getAchievementName() != null ? record.getAchievementName() : "");
+                    row.createCell(2).setCellValue(record.getWordCount() != null
+                            ? record.getWordCount().stripTrailingZeros().toPlainString() : "0");
+                    row.createCell(3).setCellValue(ResearchScoringConstants.getTextbookTypeText(record.getTextbookType()));
+                    row.createCell(4).setCellValue(formatResearchMemberNames(record.getMemberData()));
+                    row.createCell(5).setCellValue(formatResearchScoreTotal(record.getId()));
+                }
+
+                for (int i = 0; i < colCount; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+            }
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -813,5 +931,36 @@ public class TeacherCompetitionRecordServiceImpl
             log.warn("解析教师JSON失败: {}", teacherJson, e);
             return teacherJson;
         }
+    }
+
+    /** 格式化科研业绩成员姓名为显示字符串 */
+    private String formatResearchMemberNames(String memberData) {
+        if (StrUtil.isBlank(memberData)) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(memberData);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.size(); i++) {
+                if (i > 0) sb.append("、");
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                sb.append(name);
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return memberData;
+        }
+    }
+
+    /** 获取科研业绩记录的总得分 */
+    private String formatResearchScoreTotal(Long recordId) {
+        List<ResearchAchievementScore> scores = researchScoreMapper.selectListByQuery(
+                QueryWrapper.create().eq("record_id", recordId));
+        if (CollUtil.isEmpty(scores)) {
+            return "0";
+        }
+        BigDecimal total = scores.stream()
+                .map(ResearchAchievementScore::getScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return total.stripTrailingZeros().toPlainString();
     }
 }
