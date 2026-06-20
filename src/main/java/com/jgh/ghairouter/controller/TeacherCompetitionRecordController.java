@@ -155,8 +155,10 @@ public class TeacherCompetitionRecordController {
     public void exportRecords(HttpServletResponse response) {
         byte[] excelData = teacherCompetitionRecordService.exportRecordsToExcel();
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        String encodedFilename = java.net.URLEncoder.encode("业绩汇总.xlsx", java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
         response.setHeader("Content-Disposition",
-                "attachment; filename=业绩汇总.xlsx");
+                "attachment; filename*=UTF-8''" + encodedFilename);
         response.setContentLength(excelData.length);
         try {
             response.getOutputStream().write(excelData);

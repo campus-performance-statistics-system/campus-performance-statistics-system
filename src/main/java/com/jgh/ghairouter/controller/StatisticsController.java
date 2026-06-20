@@ -40,8 +40,10 @@ public class StatisticsController {
     public void exportAllAttachments(HttpServletResponse response) {
         byte[] zipData = statisticsService.exportAllAttachmentsToZip();
         response.setContentType("application/zip");
+        String encodedFilename = java.net.URLEncoder.encode("所有附件.zip", java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
         response.setHeader("Content-Disposition",
-                "attachment; filename=all_attachments.zip");
+                "attachment; filename*=UTF-8''" + encodedFilename);
         response.setContentLength(zipData.length);
         try {
             response.getOutputStream().write(zipData);

@@ -37,11 +37,17 @@ public final class TeachingReformScoringConstants {
     public static final String PROJECT_TYPE_TEXT_UNIVERSITY_COURSE_IDEOLOGY = "校级课程思政项目";
 
     // ==================== 项目状态 ====================
+    /** 新增（获批立项） */
     public static final String STATUS_APPROVED = "approved";
+    /** 结题（已结题的项目） */
+    public static final String STATUS_CONCLUDED = "concluded";
+    /** 未获批 */
     public static final String STATUS_NOT_APPROVED = "not_approved";
+    /** 未下文 */
     public static final String STATUS_PENDING_DECISION = "pending_decision";
 
-    public static final String STATUS_TEXT_APPROVED = "获批立项";
+    public static final String STATUS_TEXT_APPROVED = "新增（获批立项）";
+    public static final String STATUS_TEXT_CONCLUDED = "结题";
     public static final String STATUS_TEXT_NOT_APPROVED = "未获批";
     public static final String STATUS_TEXT_PENDING_DECISION = "未下文";
 
@@ -75,7 +81,7 @@ public final class TeachingReformScoringConstants {
         if (STATUS_NOT_APPROVED.equals(projectStatus) || STATUS_PENDING_DECISION.equals(projectStatus)) {
             return SCORE_NOT_APPROVED;
         }
-        // 获批立项：根据项目类型返回不同总分
+        // 获批（新增/结题）：根据项目类型返回不同总分
         if (PROJECT_TYPE_PROVINCIAL_EDUCATION_REFORM.equals(projectType)) {
             return SCORE_PROVINCIAL_EDUCATION_REFORM;
         }
@@ -201,6 +207,7 @@ public final class TeachingReformScoringConstants {
         if (projectStatus == null) return null;
         return switch (projectStatus) {
             case STATUS_APPROVED -> STATUS_TEXT_APPROVED;
+            case STATUS_CONCLUDED -> STATUS_TEXT_CONCLUDED;
             case STATUS_NOT_APPROVED -> STATUS_TEXT_NOT_APPROVED;
             case STATUS_PENDING_DECISION -> STATUS_TEXT_PENDING_DECISION;
             default -> projectStatus;
@@ -213,7 +220,7 @@ public final class TeachingReformScoringConstants {
     }
 
     public static List<String> getAvailableStatuses() {
-        return List.of(STATUS_APPROVED, STATUS_NOT_APPROVED, STATUS_PENDING_DECISION);
+        return List.of(STATUS_APPROVED, STATUS_CONCLUDED, STATUS_NOT_APPROVED, STATUS_PENDING_DECISION);
     }
 
     /**

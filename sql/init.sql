@@ -284,7 +284,7 @@ CREATE TABLE IF NOT EXISTS teaching_reform_record
     user_id           BIGINT                                NOT NULL COMMENT '填报用户ID',
     project_name      VARCHAR(256)                          NOT NULL COMMENT '项目名称',
     project_type      VARCHAR(32)                           NOT NULL COMMENT '项目类型：provincial_education_reform-教育厅教改工程, young_teacher_basic-中青年教师基础能力提升, university_research-校级科研, university_course_ideology-校级课程思政',
-    project_status    VARCHAR(32) DEFAULT 'approved'        NULL COMMENT '项目状态：approved-获批立项, not_approved-未获批, pending_decision-未下文',
+    project_status    VARCHAR(32) DEFAULT 'approved'        NULL COMMENT '项目状态：approved-新增（获批立项）, concluded-结题, not_approved-未获批, pending_decision-未下文',
     project_leader    VARCHAR(128)                          NULL COMMENT '项目负责人（教师姓名）',
     member_data       TEXT                                  NULL COMMENT '项目组成员及得分分配JSON数组',
     score_data        TEXT                                  NULL COMMENT '得分明细JSON数组',

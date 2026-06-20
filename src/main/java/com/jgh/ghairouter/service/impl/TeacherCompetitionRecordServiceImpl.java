@@ -938,52 +938,7 @@ public class TeacherCompetitionRecordServiceImpl
             }
 
             // ========== Sheet 6：教改科研项目业绩（v7） ==========
-            {
-                String[] headers = {"序号", "项目名称", "项目类型", "项目状态", "项目负责人", "项目组成员及得分"};
-                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("6-教改科研项目业绩");
-
-                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
-                for (int i = 0; i < headers.length; i++) {
-                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
-                    cell.setCellValue(headers[i]);
-                    cell.setCellStyle(headerStyle);
-                }
-
-                List<com.jgh.ghairouter.model.entity.TeachingReformRecord> teachingReformRecords =
-                        teachingReformRecordMapper.selectListByQuery(
-                                QueryWrapper.create().orderBy("create_time", true));
-
-                int rowIdx = 1;
-                int seq = 1;
-                for (com.jgh.ghairouter.model.entity.TeachingReformRecord record : teachingReformRecords) {
-                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
-                    row.createCell(0).setCellValue(seq++);
-                    row.createCell(1).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
-
-                    String typeText = record.getProjectType();
-                    if ("provincial_education_reform".equals(typeText)) typeText = "教育厅教改工程项目";
-                    else if ("young_teacher_basic".equals(typeText)) typeText = "中青年教师基础能力提升项目";
-                    else if ("university_research".equals(typeText)) typeText = "校级科研项目";
-                    else if ("university_course_ideology".equals(typeText)) typeText = "校级课程思政项目";
-                    row.createCell(2).setCellValue(typeText);
-
-                    String statusText = record.getProjectStatus();
-                    if ("approved".equals(statusText)) statusText = "获批立项";
-                    else if ("not_approved".equals(statusText)) statusText = "未获批";
-                    else if ("pending_decision".equals(statusText)) statusText = "未下文";
-                    row.createCell(3).setCellValue(statusText);
-
-                    row.createCell(4).setCellValue(record.getProjectLeader() != null ? record.getProjectLeader() : "");
-
-                    // 格式化成员及得分
-                    row.createCell(5).setCellValue(formatTeachingReformMemberScores(
-                            record.getMemberData(), record.getProjectType(), record.getProjectStatus()));
-                }
-
-                for (int i = 0; i < headers.length; i++) {
-                    sheet.autoSizeColumn(i);
-                }
-            }
+            writeTeachingReformSheet(workbook, headerStyle);
 
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
@@ -991,6 +946,120 @@ public class TeacherCompetitionRecordServiceImpl
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 写入教改科研项目业绩Sheet，严格参照Excel示例格式。
+     * 分为"新增"和"结题"两部分，按项目类型分组。
+     */
+    private void writeTeachingReformSheet(org.apache.poi.xssf.usermodel.XSSFWorkbook workbook,
+                                          org.apache.poi.ss.usermodel.CellStyle headerStyle) {
+        org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("6-教改科研项目业绩");
+        String[] headers = {"序号", "项目名称", "项目类型", "项目组成员及排名"};
+
+        List<com.jgh.ghairouter.model.entity.TeachingReformRecord> allRecords =
+                teachingReformRecordMapper.selectListByQuery(
+                        QueryWrapper.create().orderBy("create_time", true));
+
+        // 分组：新增（approved）、结题（concluded + not_approved + pending_decision）
+        List<com.jgh.ghairouter.model.entity.TeachingReformRecord> newList = new ArrayList<>();
+        List<com.jgh.ghairouter.model.entity.TeachingReformRecord> concludedList = new ArrayList<>();
+        for (com.jgh.ghairouter.model.entity.TeachingReformRecord r : allRecords) {
+            if ("approved".equals(r.getProjectStatus())) {
+                newList.add(r);
+            } else {
+                concludedList.add(r);
+            }
+        }
+
+        int rowIdx = 0;
+
+        // ===== 一、新增项目 =====
+        if (!newList.isEmpty()) {
+            rowIdx = writeReformSection(sheet, headerStyle, headers,
+                    "信息工程学院新增教改科研项目统计（教务汇总）",
+                    newList, rowIdx);
+            rowIdx += 2; // 空两行
+        }
+
+        // ===== 二、结题项目 =====
+        if (!concludedList.isEmpty()) {
+            rowIdx = writeReformSection(sheet, headerStyle, headers,
+                    "信息工程学院结题教改科研项目统计（教务汇总）",
+                    concludedList, rowIdx);
+        }
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    /**
+     * 写入一个章节（新增或结题），按项目类型分组。
+     * 返回写入后的行号。
+     */
+    private int writeReformSection(org.apache.poi.ss.usermodel.Sheet sheet,
+                                   org.apache.poi.ss.usermodel.CellStyle headerStyle,
+                                   String[] headers,
+                                   String sectionTitle,
+                                   List<com.jgh.ghairouter.model.entity.TeachingReformRecord> records,
+                                   int rowIdx) {
+        // 章节标题
+        org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(sectionTitle);
+        titleCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(
+                rowIdx - 1, rowIdx - 1, 0, headers.length - 1));
+
+        // 按项目类型分组
+        java.util.Map<String, List<com.jgh.ghairouter.model.entity.TeachingReformRecord>> grouped =
+                new java.util.LinkedHashMap<>();
+        // 保持插入顺序
+        String[] typeOrder = {"provincial_education_reform", "young_teacher_basic",
+                "university_research", "university_course_ideology"};
+        for (String t : typeOrder) grouped.put(t, new ArrayList<>());
+        for (com.jgh.ghairouter.model.entity.TeachingReformRecord r : records) {
+            String pt = r.getProjectType() != null ? r.getProjectType() : "";
+            grouped.computeIfAbsent(pt, k -> new ArrayList<>()).add(r);
+        }
+
+        int globalSeq = 1;
+        for (java.util.Map.Entry<String, List<com.jgh.ghairouter.model.entity.TeachingReformRecord>> entry :
+                grouped.entrySet()) {
+            List<com.jgh.ghairouter.model.entity.TeachingReformRecord> group = entry.getValue();
+            if (group.isEmpty()) continue;
+
+            // 表头行
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(rowIdx++);
+            for (int i = 0; i < headers.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // 数据行
+            for (com.jgh.ghairouter.model.entity.TeachingReformRecord record : group) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(globalSeq++);
+                row.createCell(1).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
+
+                // 项目类型：对于未获批/未下文/结题，类型列留空（与Excel一致）
+                String status = record.getProjectStatus();
+                if ("approved".equals(status) || "concluded".equals(status)) {
+                    row.createCell(2).setCellValue(
+                            com.jgh.ghairouter.model.constants.TeachingReformScoringConstants
+                                    .getProjectTypeText(record.getProjectType()));
+                } else {
+                    row.createCell(2).setCellValue("");
+                }
+
+                // 成员及得分
+                row.createCell(3).setCellValue(formatTeachingReformMemberScores(
+                        record.getMemberData(), record.getProjectType(), record.getProjectStatus()));
+            }
+        }
+        return rowIdx;
     }
 
     @Override
@@ -1155,8 +1224,33 @@ public class TeacherCompetitionRecordServiceImpl
         }
     }
 
-    /** 格式化教改科研项目成员得分为 "姓名分数、姓名分数" 格式 */
+    /**
+     * 格式化教改科研项目成员及得分。
+     * 未获批/未下文：显示为 "未获批：姓名（申报人）2" 或 "未下文：姓名（申报人）2"
+     * 获批：显示为 "姓名分数、姓名分数" 格式（如 "蒋红梅7、黄鹏0.38"）
+     */
     private String formatTeachingReformMemberScores(String memberData, String projectType, String projectStatus) {
+        // 结题/未获批/未下文：显示申报人信息
+        if ("not_approved".equals(projectStatus) || "pending_decision".equals(projectStatus)
+                || "concluded".equals(projectStatus)) {
+            String label;
+            if ("not_approved".equals(projectStatus)) label = "未获批：";
+            else if ("pending_decision".equals(projectStatus)) label = "未下文：";
+            else label = "结题：";
+            if (StrUtil.isBlank(memberData)) return label + "2";
+            try {
+                cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(memberData);
+                if (arr.size() > 0) {
+                    String name = arr.getJSONObject(0).getStr("teacherName", "");
+                    if (StrUtil.isNotBlank(name)) {
+                        return label + name + "（申报人）2";
+                    }
+                }
+            } catch (Exception ignored) {}
+            return label + "2";
+        }
+
+        // 获批项目：格式化成员及得分
         if (StrUtil.isBlank(memberData)) return "";
         try {
             cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(memberData);
