@@ -231,3 +231,46 @@ CREATE TABLE IF NOT EXISTS research_achievement_score
     INDEX idx_user_id (user_id),
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '科研及教材业绩得分明细' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 大创业绩记录表（v6） =====================
+DROP TABLE IF EXISTS innovation_entrepreneurship_record;
+CREATE TABLE IF NOT EXISTS innovation_entrepreneurship_record
+(
+    id                BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name         VARCHAR(64)   DEFAULT '大创业绩' NOT NULL COMMENT '记录类型名称',
+    user_id           BIGINT                                NOT NULL COMMENT '填报用户ID',
+    project_number    VARCHAR(128)                          NULL COMMENT '项目编号',
+    project_name      VARCHAR(256)                          NOT NULL COMMENT '项目名称',
+    project_level     VARCHAR(32)                           NOT NULL COMMENT '项目级别：national-国家级, regional-区级',
+    project_type      VARCHAR(32)                           NOT NULL COMMENT '项目类型：innovation_training-创新训练, entrepreneurship_training-创业训练, entrepreneurship_practice-创业实践',
+    project_status    VARCHAR(32) DEFAULT 'newly_added'     NULL COMMENT '项目状态：concluded-结题, newly_added-新增',
+    student_leader    VARCHAR(128)                          NULL COMMENT '项目负责人（学生姓名）',
+    member_data       TEXT                                  NULL COMMENT '指导教师成员及得分分配JSON数组',
+    score_data        TEXT                                  NULL COMMENT '得分明细JSON数组',
+    proof_image_data  LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete         TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_project_level (project_level),
+    INDEX idx_project_name (project_name)
+) COMMENT '大创业绩记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 大创业绩得分明细表（v6） =====================
+DROP TABLE IF EXISTS innovation_entrepreneurship_score;
+CREATE TABLE IF NOT EXISTS innovation_entrepreneurship_score
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id    BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id      BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score        DECIMAL(6,3) NOT NULL COMMENT '得分',
+    is_leader    TINYINT DEFAULT 0 NOT NULL COMMENT '是否负责人：1是0否',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete    TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '大创业绩得分明细' COLLATE utf8mb4_unicode_ci;

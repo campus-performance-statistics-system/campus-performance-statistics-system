@@ -3,11 +3,13 @@ package com.jgh.ghairouter.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
+import com.jgh.ghairouter.mapper.InnovationEntrepreneurshipRecordMapper;
 import com.jgh.ghairouter.mapper.ResearchAchievementRecordMapper;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TeacherCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
+import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
 import com.jgh.ghairouter.model.entity.ResearchAchievementRecord;
 import com.jgh.ghairouter.model.entity.StudentCompetitionRecord;
 import com.jgh.ghairouter.model.entity.TeacherCompetitionRecord;
@@ -49,6 +51,9 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private ResearchAchievementRecordMapper researchRecordMapper;
+
+    @Resource
+    private InnovationEntrepreneurshipRecordMapper innovationRecordMapper;
 
     @Resource
     private UserMapper userMapper;
@@ -112,13 +117,27 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     /**
-     * 所有比赛总分（user_competition_score + advisor_score + training_guidance_score + research_achievement_score 合并）
+     * 大创业绩总分（innovation_entrepreneurship_score 表）
+     */
+    private static final String INNOVATION_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              COALESCE(SUM(iscore.score), 0) AS total_score
+            FROM user u
+            INNER JOIN innovation_entrepreneurship_score iscore ON u.id = iscore.user_id AND iscore.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 所有比赛总分（五类得分合并）
      */
     private static final String ALL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
               u.user_name,
-              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) AS total_score
+              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) AS total_score
             FROM user u
             LEFT JOIN (
               SELECT
@@ -152,8 +171,16 @@ public class StatisticsServiceImpl implements StatisticsService {
               WHERE is_delete = 0
               GROUP BY user_id
             ) rscore ON u.id = rscore.user_id
+            LEFT JOIN (
+              SELECT
+                user_id,
+                SUM(score) AS innovation_score
+              FROM innovation_entrepreneurship_score
+              WHERE is_delete = 0
+              GROUP BY user_id
+            ) iscore ON u.id = iscore.user_id
             WHERE u.is_delete = 0
-              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL)
+              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL OR iscore.innovation_score IS NOT NULL)
             """;
 
     @Override
@@ -167,6 +194,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = TRAINING_SCORE_SQL;
         } else if ("research".equals(type)) {
             sql = RESEARCH_SCORE_SQL;
+        } else if ("innovation".equals(type)) {
+            sql = INNOVATION_SCORE_SQL;
         } else {
             // "all" — 合并所有
             sql = ALL_SCORE_SQL;
@@ -303,6 +332,31 @@ public class StatisticsServiceImpl implements StatisticsService {
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + trainingName + semester + "-" + userName + ".png";
                 String zipPath = "所有附件/指导实训/" + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 大创业绩（v6） ----
+            List<InnovationEntrepreneurshipRecord> innovationRecords = innovationRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (InnovationEntrepreneurshipRecord record : innovationRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String projectName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getProjectName())
+                                ? record.getProjectName() : "未知项目");
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + projectName + "-" + userName + ".png";
+                String zipPath = "所有附件/大创业绩/" + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;

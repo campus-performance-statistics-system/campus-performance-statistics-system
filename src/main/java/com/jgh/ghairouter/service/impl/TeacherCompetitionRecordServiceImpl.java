@@ -8,6 +8,7 @@ import cn.hutool.json.JSONObject;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.*;
+import com.jgh.ghairouter.model.constants.InnovationScoringConstants;
 import com.jgh.ghairouter.model.constants.ResearchScoringConstants;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.*;
@@ -68,6 +69,10 @@ public class TeacherCompetitionRecordServiceImpl
     private ResearchAchievementRecordMapper researchRecordMapper;
     @Resource
     private ResearchAchievementScoreMapper researchScoreMapper;
+    @Resource
+    private InnovationEntrepreneurshipRecordMapper innovationRecordMapper;
+    @Resource
+    private InnovationEntrepreneurshipScoreMapper innovationScoreMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -834,6 +839,102 @@ public class TeacherCompetitionRecordServiceImpl
                 }
             }
 
+            // ========== Sheet 5：大创业绩（v6） ==========
+            {
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("5-大创业绩");
+
+                org.apache.poi.ss.usermodel.CellStyle sectionStyle2 = workbook.createCellStyle();
+                sectionStyle2.setFont(headerFont);
+                sectionStyle2.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+                sectionStyle2.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+
+                String[] ieHeaders = {"序号", "项目编号", "项目名称", "级别", "项目类型", "项目负责人", "指导教师及得分"};
+                int ieColCount = ieHeaders.length;
+
+                List<InnovationEntrepreneurshipRecord> ieAllRecords = innovationRecordMapper.selectListByQuery(
+                        QueryWrapper.create().orderBy("create_time", true));
+
+                // 按项目状态分组
+                List<InnovationEntrepreneurshipRecord> ieConcluded = new ArrayList<>();
+                List<InnovationEntrepreneurshipRecord> ieNew = new ArrayList<>();
+                List<InnovationEntrepreneurshipRecord> ieOther = new ArrayList<>();
+                for (InnovationEntrepreneurshipRecord r : ieAllRecords) {
+                    if (InnovationScoringConstants.STATUS_CONCLUDED.equals(r.getProjectStatus())) {
+                        ieConcluded.add(r);
+                    } else if (InnovationScoringConstants.STATUS_NEWLY_ADDED.equals(r.getProjectStatus())) {
+                        ieNew.add(r);
+                    } else {
+                        ieOther.add(r);
+                    }
+                }
+
+                int ieRowIdx = 0;
+
+                // ---- 结题项目 ----
+                if (!ieConcluded.isEmpty() || !ieOther.isEmpty()) {
+                    org.apache.poi.ss.usermodel.Row secTitle1 = sheet.createRow(ieRowIdx++);
+                    org.apache.poi.ss.usermodel.Cell secCell1 = secTitle1.createCell(0);
+                    secCell1.setCellValue("一、结题的创新创业训练计划项目");
+                    secCell1.setCellStyle(sectionStyle2);
+                    sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(ieRowIdx - 1, ieRowIdx - 1, 0, ieColCount - 1));
+
+                    org.apache.poi.ss.usermodel.Row ieHdr1 = sheet.createRow(ieRowIdx++);
+                    for (int i = 0; i < ieHeaders.length; i++) {
+                        org.apache.poi.ss.usermodel.Cell cell = ieHdr1.createCell(i);
+                        cell.setCellValue(ieHeaders[i]);
+                        cell.setCellStyle(headerStyle);
+                    }
+
+                    List<InnovationEntrepreneurshipRecord> sec1 = new ArrayList<>();
+                    sec1.addAll(ieConcluded);
+                    sec1.addAll(ieOther);
+                    int seq = 1;
+                    for (InnovationEntrepreneurshipRecord record : sec1) {
+                        org.apache.poi.ss.usermodel.Row row = sheet.createRow(ieRowIdx++);
+                        row.createCell(0).setCellValue(seq++);
+                        row.createCell(1).setCellValue(record.getProjectNumber() != null ? record.getProjectNumber() : "");
+                        row.createCell(2).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
+                        row.createCell(3).setCellValue(InnovationScoringConstants.getLevelText(record.getProjectLevel()));
+                        row.createCell(4).setCellValue(InnovationScoringConstants.getProjectTypeText(record.getProjectType()));
+                        row.createCell(5).setCellValue(record.getStudentLeader() != null ? record.getStudentLeader() : "");
+                        row.createCell(6).setCellValue(formatInnovationTeacherScores(record.getMemberData(), record.getProjectLevel()));
+                    }
+                    ieRowIdx += 2;
+                }
+
+                // ---- 新增项目 ----
+                if (!ieNew.isEmpty()) {
+                    org.apache.poi.ss.usermodel.Row secTitle2 = sheet.createRow(ieRowIdx++);
+                    org.apache.poi.ss.usermodel.Cell secCell2 = secTitle2.createCell(0);
+                    secCell2.setCellValue("二、新增的创新创业训练计划项目");
+                    secCell2.setCellStyle(sectionStyle2);
+                    sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(ieRowIdx - 1, ieRowIdx - 1, 0, ieColCount - 1));
+
+                    org.apache.poi.ss.usermodel.Row ieHdr2 = sheet.createRow(ieRowIdx++);
+                    for (int i = 0; i < ieHeaders.length; i++) {
+                        org.apache.poi.ss.usermodel.Cell cell = ieHdr2.createCell(i);
+                        cell.setCellValue(ieHeaders[i]);
+                        cell.setCellStyle(headerStyle);
+                    }
+
+                    int seq = 1;
+                    for (InnovationEntrepreneurshipRecord record : ieNew) {
+                        org.apache.poi.ss.usermodel.Row row = sheet.createRow(ieRowIdx++);
+                        row.createCell(0).setCellValue(seq++);
+                        row.createCell(1).setCellValue(record.getProjectNumber() != null ? record.getProjectNumber() : "");
+                        row.createCell(2).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
+                        row.createCell(3).setCellValue(InnovationScoringConstants.getLevelText(record.getProjectLevel()));
+                        row.createCell(4).setCellValue(InnovationScoringConstants.getProjectTypeText(record.getProjectType()));
+                        row.createCell(5).setCellValue(record.getStudentLeader() != null ? record.getStudentLeader() : "");
+                        row.createCell(6).setCellValue(formatInnovationTeacherScores(record.getMemberData(), record.getProjectLevel()));
+                    }
+                }
+
+                for (int i = 0; i < ieHeaders.length; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+            }
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -962,5 +1063,45 @@ public class TeacherCompetitionRecordServiceImpl
                 .map(ResearchAchievementScore::getScore)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return total.stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 格式化大创业绩指导教师及得分
+     * 格式：教师名得分、教师名得分
+     */
+    private String formatInnovationTeacherScores(String memberData, String projectLevel) {
+        if (StrUtil.isBlank(memberData)) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(memberData);
+            int memberCount = arr.size();
+            if (memberCount == 0) return "";
+
+            BigDecimal totalScore = InnovationScoringConstants.calcProjectScore(projectLevel);
+            if (totalScore.compareTo(BigDecimal.ZERO) <= 0) return "";
+
+            int leaderIndex = -1;
+            for (int i = 0; i < arr.size(); i++) {
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                if (entry.getBool("isLeader", false)) {
+                    leaderIndex = i;
+                    break;
+                }
+            }
+
+            List<BigDecimal> distributed = InnovationScoringConstants.distributeScore(totalScore, memberCount, leaderIndex);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.size(); i++) {
+                if (i > 0) sb.append("、");
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                sb.append(name);
+                sb.append(distributed.get(i).stripTrailingZeros().toPlainString());
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("格式化大创业绩指导教师得分失败: {}", memberData, e);
+            return memberData;
+        }
     }
 }
