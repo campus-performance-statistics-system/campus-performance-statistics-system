@@ -73,6 +73,8 @@ public class TeacherCompetitionRecordServiceImpl
     private InnovationEntrepreneurshipRecordMapper innovationRecordMapper;
     @Resource
     private InnovationEntrepreneurshipScoreMapper innovationScoreMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.TeachingReformRecordMapper teachingReformRecordMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -935,6 +937,54 @@ public class TeacherCompetitionRecordServiceImpl
                 }
             }
 
+            // ========== Sheet 6：教改科研项目业绩（v7） ==========
+            {
+                String[] headers = {"序号", "项目名称", "项目类型", "项目状态", "项目负责人", "项目组成员及得分"};
+                org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("6-教改科研项目业绩");
+
+                org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+                for (int i = 0; i < headers.length; i++) {
+                    org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                List<com.jgh.ghairouter.model.entity.TeachingReformRecord> teachingReformRecords =
+                        teachingReformRecordMapper.selectListByQuery(
+                                QueryWrapper.create().orderBy("create_time", true));
+
+                int rowIdx = 1;
+                int seq = 1;
+                for (com.jgh.ghairouter.model.entity.TeachingReformRecord record : teachingReformRecords) {
+                    org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(seq++);
+                    row.createCell(1).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
+
+                    String typeText = record.getProjectType();
+                    if ("provincial_education_reform".equals(typeText)) typeText = "教育厅教改工程项目";
+                    else if ("young_teacher_basic".equals(typeText)) typeText = "中青年教师基础能力提升项目";
+                    else if ("university_research".equals(typeText)) typeText = "校级科研项目";
+                    else if ("university_course_ideology".equals(typeText)) typeText = "校级课程思政项目";
+                    row.createCell(2).setCellValue(typeText);
+
+                    String statusText = record.getProjectStatus();
+                    if ("approved".equals(statusText)) statusText = "获批立项";
+                    else if ("not_approved".equals(statusText)) statusText = "未获批";
+                    else if ("pending_decision".equals(statusText)) statusText = "未下文";
+                    row.createCell(3).setCellValue(statusText);
+
+                    row.createCell(4).setCellValue(record.getProjectLeader() != null ? record.getProjectLeader() : "");
+
+                    // 格式化成员及得分
+                    row.createCell(5).setCellValue(formatTeachingReformMemberScores(
+                            record.getMemberData(), record.getProjectType(), record.getProjectStatus()));
+                }
+
+                for (int i = 0; i < headers.length; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+            }
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -1101,6 +1151,45 @@ public class TeacherCompetitionRecordServiceImpl
             return sb.toString();
         } catch (Exception e) {
             log.error("格式化大创业绩指导教师得分失败: {}", memberData, e);
+            return memberData;
+        }
+    }
+
+    /** 格式化教改科研项目成员得分为 "姓名分数、姓名分数" 格式 */
+    private String formatTeachingReformMemberScores(String memberData, String projectType, String projectStatus) {
+        if (StrUtil.isBlank(memberData)) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(memberData);
+            int memberCount = arr.size();
+            if (memberCount == 0) return "";
+
+            BigDecimal totalScore = com.jgh.ghairouter.model.constants.TeachingReformScoringConstants
+                    .calcProjectScore(projectType, projectStatus);
+            if (totalScore.compareTo(BigDecimal.ZERO) <= 0) return "";
+
+            int leaderIndex = -1;
+            for (int i = 0; i < arr.size(); i++) {
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                if (entry.getBool("isLeader", false)) {
+                    leaderIndex = i;
+                    break;
+                }
+            }
+
+            List<BigDecimal> distributed = com.jgh.ghairouter.model.constants.TeachingReformScoringConstants
+                    .distributeScore(totalScore, memberCount, leaderIndex);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.size(); i++) {
+                if (i > 0) sb.append("、");
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                sb.append(name);
+                sb.append(distributed.get(i).stripTrailingZeros().toPlainString());
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("格式化教改科研项目成员得分失败: {}", memberData, e);
             return memberData;
         }
     }

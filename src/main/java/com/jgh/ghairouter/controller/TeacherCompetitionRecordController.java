@@ -156,7 +156,7 @@ public class TeacherCompetitionRecordController {
         byte[] excelData = teacherCompetitionRecordService.exportRecordsToExcel();
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition",
-                "attachment; filename=competition_scores.xlsx");
+                "attachment; filename=业绩汇总.xlsx");
         response.setContentLength(excelData.length);
         try {
             response.getOutputStream().write(excelData);

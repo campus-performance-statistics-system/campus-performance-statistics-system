@@ -274,3 +274,44 @@ CREATE TABLE IF NOT EXISTS innovation_entrepreneurship_score
     INDEX idx_user_id (user_id),
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '大创业绩得分明细' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 教改科研项目业绩记录表（v7） =====================
+DROP TABLE IF EXISTS teaching_reform_record;
+CREATE TABLE IF NOT EXISTS teaching_reform_record
+(
+    id                BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name         VARCHAR(64)   DEFAULT '教改科研项目业绩' NOT NULL COMMENT '记录类型名称',
+    user_id           BIGINT                                NOT NULL COMMENT '填报用户ID',
+    project_name      VARCHAR(256)                          NOT NULL COMMENT '项目名称',
+    project_type      VARCHAR(32)                           NOT NULL COMMENT '项目类型：provincial_education_reform-教育厅教改工程, young_teacher_basic-中青年教师基础能力提升, university_research-校级科研, university_course_ideology-校级课程思政',
+    project_status    VARCHAR(32) DEFAULT 'approved'        NULL COMMENT '项目状态：approved-获批立项, not_approved-未获批, pending_decision-未下文',
+    project_leader    VARCHAR(128)                          NULL COMMENT '项目负责人（教师姓名）',
+    member_data       TEXT                                  NULL COMMENT '项目组成员及得分分配JSON数组',
+    score_data        TEXT                                  NULL COMMENT '得分明细JSON数组',
+    proof_image_data  LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete         TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_project_type (project_type),
+    INDEX idx_project_name (project_name)
+) COMMENT '教改科研项目业绩记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 教改科研项目业绩得分明细表（v7） =====================
+DROP TABLE IF EXISTS teaching_reform_score;
+CREATE TABLE IF NOT EXISTS teaching_reform_score
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id    BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id      BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score        DECIMAL(6,3) NOT NULL COMMENT '得分',
+    is_leader    TINYINT DEFAULT 0 NOT NULL COMMENT '是否负责人：1是0否',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete    TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '教改科研项目业绩得分明细' COLLATE utf8mb4_unicode_ci;
