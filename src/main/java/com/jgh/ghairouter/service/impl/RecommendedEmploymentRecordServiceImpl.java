@@ -1,0 +1,368 @@
+package com.jgh.ghairouter.service.impl;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+import com.jgh.ghairouter.exception.BusinessException;
+import com.jgh.ghairouter.exception.ErrorCode;
+import com.jgh.ghairouter.mapper.RecommendedEmploymentRecordMapper;
+import com.jgh.ghairouter.mapper.TeacherCompetitionAuditRecordMapper;
+import com.jgh.ghairouter.mapper.UserMapper;
+import com.jgh.ghairouter.model.constants.RecommendedEmploymentScoringConstants;
+import com.jgh.ghairouter.model.dto.competition.RecommendedEmploymentQueryRequest;
+import com.jgh.ghairouter.model.entity.RecommendedEmploymentRecord;
+import com.jgh.ghairouter.model.entity.TeacherCompetitionAuditRecord;
+import com.jgh.ghairouter.model.entity.User;
+import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
+import com.jgh.ghairouter.model.vo.RecommendedEmploymentRecordVO;
+import com.jgh.ghairouter.service.RecommendedEmploymentRecordService;
+import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * 推荐学院学生签约就业记录服务实现（v13）。
+ * 纯数据记录，不涉及计分。
+ */
+@Slf4j
+@Service
+public class RecommendedEmploymentRecordServiceImpl
+        extends ServiceImpl<RecommendedEmploymentRecordMapper, RecommendedEmploymentRecord>
+        implements RecommendedEmploymentRecordService {
+
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private TeacherCompetitionAuditRecordMapper auditMapper;
+
+    private static final String DEFAULT_TYPE_NAME = RecommendedEmploymentScoringConstants.TYPE_NAME;
+
+    @Override
+    public Long addRecord(Long userId,
+                          String teacherName,
+                          String companyName,
+                          Integer contractCount,
+                          String recommendationTime,
+                          MultipartFile file) {
+
+        String base64 = null;
+        if (file != null && !file.isEmpty()) {
+            try {
+                base64 = Base64.getEncoder().encodeToString(file.getBytes());
+            } catch (IOException e) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "读取文件失败");
+            }
+        }
+
+        RecommendedEmploymentRecord record = new RecommendedEmploymentRecord();
+        record.setUserId(userId);
+        record.setTypeName(DEFAULT_TYPE_NAME);
+        record.setTeacherName(teacherName);
+        record.setCompanyName(companyName);
+        record.setContractCount(contractCount != null ? contractCount : 0);
+        record.setRecommendationTime(recommendationTime);
+        record.setProofImageData(base64);
+
+        boolean saved = this.save(record);
+        if (!saved) throw new BusinessException(ErrorCode.OPERATION_ERROR, "提交失败");
+
+        // 创建审核记录
+        TeacherCompetitionAuditRecord audit = new TeacherCompetitionAuditRecord();
+        audit.setRecordId(record.getId());
+        audit.setRecordType(DEFAULT_TYPE_NAME);
+        audit.setAutoReviewStatus(ReviewStatusEnum.PENDING.getValue());
+        audit.setAdminReviewStatus(ReviewStatusEnum.PENDING.getValue());
+        LocalDateTime now = LocalDateTime.now();
+        audit.setCreateTime(now);
+        audit.setUpdateTime(now);
+        auditMapper.insert(audit);
+
+        return record.getId();
+    }
+
+    @Override
+    public QueryWrapper getQueryWrapper(RecommendedEmploymentQueryRequest req) {
+        if (req == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq("id", req.getId())
+                .eq("user_id", req.getUserId())
+                .like("teacher_name", req.getTeacherName())
+                .like("company_name", req.getCompanyName());
+        if (StrUtil.isNotBlank(req.getSortField())) {
+            wrapper.orderBy(req.getSortField(), "ascend".equals(req.getSortOrder()));
+        }
+        wrapper.orderBy("create_time", false);
+        return wrapper;
+    }
+
+    @Override
+    public RecommendedEmploymentRecordVO getRecordVO(RecommendedEmploymentRecord record) {
+        if (record == null) return null;
+        RecommendedEmploymentRecordVO vo = new RecommendedEmploymentRecordVO();
+        BeanUtil.copyProperties(record, vo);
+
+        if (record.getUserId() != null) {
+            User u = userMapper.selectOneById(record.getUserId());
+            if (u != null) vo.setUserName(u.getUserName());
+        }
+
+        // 审核信息
+        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+                QueryWrapper.create().eq("record_id", record.getId())
+                        .eq("record_type", record.getTypeName()));
+        if (audit != null) {
+            vo.setAutoReviewStatus(audit.getAutoReviewStatus());
+            vo.setAutoReviewComment(audit.getAutoReviewComment());
+            vo.setAdminReviewStatus(audit.getAdminReviewStatus());
+            vo.setAdminReviewComment(audit.getAdminReviewComment());
+            if (audit.getAdminId() != null) {
+                User admin = userMapper.selectOneById(audit.getAdminId());
+                if (admin != null) vo.setAdminName(admin.getUserName());
+            }
+            vo.setAdminReviewTime(audit.getAdminReviewTime());
+        }
+
+        return vo;
+    }
+
+    @Override
+    public Page<RecommendedEmploymentRecordVO> pageRecords(RecommendedEmploymentQueryRequest req) {
+        long pageNum = req.getPageNum();
+        long pageSize = req.getPageSize();
+
+        QueryWrapper wrapper = getQueryWrapper(req);
+        if (StrUtil.isNotBlank(req.getAdminReviewStatus())) {
+            Page<RecommendedEmploymentRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+            List<RecommendedEmploymentRecordVO> voList = recordPage.getRecords().stream()
+                    .map(this::getRecordVO)
+                    .filter(vo -> req.getAdminReviewStatus().equals(vo.getAdminReviewStatus()))
+                    .collect(Collectors.toList());
+            Page<RecommendedEmploymentRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
+            voPage.setRecords(voList);
+            return voPage;
+        }
+        Page<RecommendedEmploymentRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+        List<RecommendedEmploymentRecordVO> voList = recordPage.getRecords().stream()
+                .map(this::getRecordVO)
+                .collect(Collectors.toList());
+        Page<RecommendedEmploymentRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
+        voPage.setRecords(voList);
+        return voPage;
+    }
+
+    @Override
+    public Page<RecommendedEmploymentRecordVO> pageMyRelatedRecords(Long userId, RecommendedEmploymentQueryRequest req) {
+        long pageNum = req.getPageNum();
+        long pageSize = req.getPageSize();
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq("id", req.getId())
+                .like("teacher_name", req.getTeacherName())
+                .like("company_name", req.getCompanyName())
+                .where("user_id = ?", userId);
+        wrapper.orderBy("create_time", false);
+
+        Page<RecommendedEmploymentRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
+        List<RecommendedEmploymentRecordVO> voList = recordPage.getRecords().stream()
+                .map(this::getRecordVO)
+                .collect(Collectors.toList());
+        Page<RecommendedEmploymentRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
+        voPage.setRecords(voList);
+        return voPage;
+    }
+
+    // ==================== 审核 ====================
+
+    @Override
+    public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
+        if (recordId == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "记录ID不能为空");
+        if (StrUtil.isBlank(reviewStatus)) throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核状态不能为空");
+
+        ReviewStatusEnum statusEnum = ReviewStatusEnum.getEnumByValue(reviewStatus);
+        if (statusEnum == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "无效的审核状态");
+        if (statusEnum == ReviewStatusEnum.PENDING)
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核状态不能为待审核");
+
+        RecommendedEmploymentRecord record = this.getById(recordId);
+        if (record == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "记录不存在");
+
+        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+                QueryWrapper.create().eq("record_id", recordId).eq("record_type", record.getTypeName()));
+        if (audit == null) throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "审核记录不存在");
+
+        if (statusEnum == ReviewStatusEnum.PASSED && StrUtil.isBlank(reviewComment))
+            reviewComment = "审核通过";
+
+        audit.setAdminReviewStatus(reviewStatus);
+        audit.setAdminReviewComment(reviewComment);
+        audit.setAdminId(adminId);
+        audit.setAdminReviewTime(LocalDateTime.now());
+
+        if (auditMapper.update(audit) <= 0)
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "审核失败");
+    }
+
+    // ==================== 导出Excel ====================
+
+    @Override
+    public byte[] exportRecordsToExcel() {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+
+            // 标题样式：宋体、加粗、16号、居中、thin边框
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setFontName("宋体");
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 16);
+            titleStyle.setFont(titleFont);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            titleStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            titleStyle.setWrapText(true);
+            titleStyle.setBorderTop(BorderStyle.THIN);
+            titleStyle.setBorderBottom(BorderStyle.THIN);
+            titleStyle.setBorderLeft(BorderStyle.THIN);
+            titleStyle.setBorderRight(BorderStyle.THIN);
+
+            // 表头样式：宋体、14号、居中、thin边框
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setFontName("宋体");
+            headerFont.setFontHeightInPoints((short) 14);
+            headerStyle.setFont(headerFont);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+
+            // 数据样式：宋体、14号、居中、thin边框
+            CellStyle dataStyle = workbook.createCellStyle();
+            Font dataFont = workbook.createFont();
+            dataFont.setFontName("宋体");
+            dataFont.setFontHeightInPoints((short) 14);
+            dataStyle.setFont(dataFont);
+            dataStyle.setAlignment(HorizontalAlignment.CENTER);
+            dataStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            dataStyle.setBorderTop(BorderStyle.THIN);
+            dataStyle.setBorderBottom(BorderStyle.THIN);
+            dataStyle.setBorderLeft(BorderStyle.THIN);
+            dataStyle.setBorderRight(BorderStyle.THIN);
+
+            Sheet sheet = workbook.createSheet("12-推荐学院学生签约就业");
+
+            // 列宽
+            sheet.setColumnWidth(0, (int) (8.22 * 256));   // A: 序号
+            sheet.setColumnWidth(1, (int) (12.22 * 256));  // B: 联系人
+            sheet.setColumnWidth(2, (int) (38.00 * 256));  // C: 单位名称
+            sheet.setColumnWidth(3, (int) (10.22 * 256));  // D: 签约数
+            sheet.setColumnWidth(4, (int) (20.22 * 256));  // E: 推荐时间
+
+            // 获取所有记录，按教师姓名、创建时间排序
+            List<RecommendedEmploymentRecord> allRecords = this.list(
+                    QueryWrapper.create().orderBy("teacher_name", true)
+                            .orderBy("create_time", true));
+
+            // 按教师姓名分组（保持插入顺序）
+            Map<String, List<RecommendedEmploymentRecord>> teacherGroups = new LinkedHashMap<>();
+            for (RecommendedEmploymentRecord r : allRecords) {
+                String name = r.getTeacherName();
+                teacherGroups.computeIfAbsent(name, k -> new ArrayList<>()).add(r);
+            }
+
+            String year = String.valueOf(Year.now().getValue());
+            int rowIdx = 0;
+
+            // 第1行：标题（合并A1:E1）
+            Row titleRow = sheet.createRow(rowIdx++);
+            titleRow.setHeight((short) (25 * 20));
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("教师" + year + "年联系就业单位汇总");
+            titleCell.setCellStyle(titleStyle);
+            for (int i = 1; i <= 4; i++) {
+                Cell c = titleRow.createCell(i);
+                c.setCellStyle(titleStyle);
+            }
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 4));
+
+            // 第2行：表头
+            Row headerRow = sheet.createRow(rowIdx++);
+            headerRow.setHeight((short) (20 * 20));
+
+            Cell cellA2 = headerRow.createCell(0);
+            cellA2.setCellValue("序号");
+            cellA2.setCellStyle(headerStyle);
+
+            Cell cellB2 = headerRow.createCell(1);
+            cellB2.setCellValue("联系人");
+            cellB2.setCellStyle(headerStyle);
+
+            Cell cellC2 = headerRow.createCell(2);
+            cellC2.setCellValue("单位名称");
+            cellC2.setCellStyle(headerStyle);
+
+            Cell cellD2 = headerRow.createCell(3);
+            cellD2.setCellValue("签约数");
+            cellD2.setCellStyle(headerStyle);
+
+            Cell cellE2 = headerRow.createCell(4);
+            cellE2.setCellValue("推荐时间");
+            cellE2.setCellStyle(headerStyle);
+
+            // 数据行：按教师分组
+            int seq = 1;
+            for (Map.Entry<String, List<RecommendedEmploymentRecord>> entry : teacherGroups.entrySet()) {
+                List<RecommendedEmploymentRecord> records = entry.getValue();
+
+                for (int i = 0; i < records.size(); i++) {
+                    RecommendedEmploymentRecord r = records.get(i);
+                    Row dataRow = sheet.createRow(rowIdx++);
+                    dataRow.setHeight((short) (20 * 20));
+
+                    Cell cellA = dataRow.createCell(0);
+                    if (i == 0) {
+                        cellA.setCellValue(seq++);
+                    }
+                    cellA.setCellStyle(dataStyle);
+
+                    Cell cellB = dataRow.createCell(1);
+                    if (i == 0) {
+                        cellB.setCellValue(r.getTeacherName() != null ? r.getTeacherName() : "");
+                    }
+                    cellB.setCellStyle(dataStyle);
+
+                    Cell cellC = dataRow.createCell(2);
+                    cellC.setCellValue(r.getCompanyName() != null ? r.getCompanyName() : "");
+                    cellC.setCellStyle(dataStyle);
+
+                    Cell cellD = dataRow.createCell(3);
+                    cellD.setCellValue(r.getContractCount() != null ? r.getContractCount() : 0);
+                    cellD.setCellStyle(dataStyle);
+
+                    Cell cellE = dataRow.createCell(4);
+                    cellE.setCellValue(r.getRecommendationTime() != null ? r.getRecommendationTime() : "");
+                    cellE.setCellStyle(dataStyle);
+                }
+            }
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            return bos.toByteArray();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
+        }
+    }
+}
