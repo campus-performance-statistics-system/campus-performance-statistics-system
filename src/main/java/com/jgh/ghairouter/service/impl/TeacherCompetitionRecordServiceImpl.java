@@ -10,6 +10,7 @@ import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.*;
 import com.jgh.ghairouter.model.constants.InnovationScoringConstants;
 import com.jgh.ghairouter.model.constants.ResearchScoringConstants;
+import com.jgh.ghairouter.model.constants.SportsScoringConstants;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
 import com.jgh.ghairouter.model.entity.*;
 import com.jgh.ghairouter.model.enums.ReviewStatusEnum;
@@ -77,6 +78,10 @@ public class TeacherCompetitionRecordServiceImpl
     private com.jgh.ghairouter.mapper.TeachingReformRecordMapper teachingReformRecordMapper;
     @Resource
     private com.jgh.ghairouter.mapper.ThesisRecordMapper thesisRecordMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.SportsEventRecordMapper sportsRecordMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.SportsEventScoreMapper sportsScoreMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -945,6 +950,9 @@ public class TeacherCompetitionRecordServiceImpl
             // ========== Sheet 7：论文业绩（v8） ==========
             writeThesisSheet(workbook, headerStyle);
 
+            // ========== Sheet 8：体育比赛业绩（v9） ==========
+            writeSportsEventSheet(workbook, headerStyle);
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -1368,6 +1376,207 @@ public class TeacherCompetitionRecordServiceImpl
 
         for (int i = 0; i < headers.length; i++) {
             sheet.autoSizeColumn(i);
+        }
+    }
+
+    // ==================== Sheet 8：体育比赛业绩（v9） ====================
+    private void writeSportsEventSheet(org.apache.poi.xssf.usermodel.XSSFWorkbook workbook,
+                                        org.apache.poi.ss.usermodel.CellStyle headerStyle) {
+        org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("8-体育比赛业绩");
+
+        // 标题样式
+        org.apache.poi.ss.usermodel.CellStyle titleStyle = workbook.createCellStyle();
+        org.apache.poi.ss.usermodel.Font titleFont = workbook.createFont();
+        titleFont.setBold(true);
+        titleFont.setFontHeightInPoints((short) 14);
+        titleStyle.setFont(titleFont);
+        titleStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+        titleStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+
+        // 数据样式
+        org.apache.poi.ss.usermodel.CellStyle dataStyle = workbook.createCellStyle();
+        dataStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+        dataStyle.setWrapText(true);
+
+        // 注脚样式
+        org.apache.poi.ss.usermodel.CellStyle noteStyle = workbook.createCellStyle();
+        noteStyle.setWrapText(true);
+
+        // 设置列宽
+        sheet.setColumnWidth(0, 20 * 256);  // A: 比赛项目
+        sheet.setColumnWidth(1, 3 * 256);   // B: 空
+        sheet.setColumnWidth(2, 55 * 256);  // C: 选手及成绩
+        sheet.setColumnWidth(3, 3 * 256);   // D: 空
+        sheet.setColumnWidth(4, 3 * 256);   // E: 空
+        sheet.setColumnWidth(5, 3 * 256);   // F: 空
+        sheet.setColumnWidth(6, 12 * 256);  // G: 姓名
+        sheet.setColumnWidth(7, 10 * 256);  // H: 业绩分
+
+        // 获取所有体育比赛记录（按创建时间排序）
+        List<SportsEventRecord> allRecords = sportsRecordMapper.selectListByQuery(
+                QueryWrapper.create().orderBy("create_time", true));
+
+        // 获取所有得分记录，按人汇总
+        List<SportsEventScore> allScores = sportsScoreMapper.selectListByQuery(
+                QueryWrapper.create().orderBy("score", false));
+
+        Map<String, BigDecimal> personScores = new LinkedHashMap<>();
+        for (SportsEventScore score : allScores) {
+            String name = score.getTeacherName();
+            personScores.merge(name, score.getScore(), BigDecimal::add);
+        }
+
+        // 按总分降序排序
+        List<Map.Entry<String, BigDecimal>> sortedPersons = new ArrayList<>(personScores.entrySet());
+        sortedPersons.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+        int rowIdx = 0;
+
+        // ========== 标题行 ==========
+        org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(java.time.Year.now().getValue() + "年参加院体育比赛汇总");
+        titleCell.setCellStyle(titleStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 7));
+
+        // ========== 表头行 ==========
+        org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell h0 = headerRow.createCell(0);
+        h0.setCellValue("比赛项目");
+        h0.setCellStyle(headerStyle);
+        org.apache.poi.ss.usermodel.Cell h2 = headerRow.createCell(2);
+        h2.setCellValue("选手及成绩");
+        h2.setCellStyle(headerStyle);
+        org.apache.poi.ss.usermodel.Cell h6 = headerRow.createCell(6);
+        h6.setCellValue("姓名");
+        h6.setCellStyle(headerStyle);
+        org.apache.poi.ss.usermodel.Cell h7 = headerRow.createCell(7);
+        h7.setCellValue("业绩分");
+        h7.setCellStyle(headerStyle);
+
+        // ========== 左侧数据：比赛项目及选手成绩 ==========
+        int dataStartRow = rowIdx;
+        for (SportsEventRecord record : allRecords) {
+            org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+
+            // A: 比赛项目
+            org.apache.poi.ss.usermodel.Cell cellA = row.createCell(0);
+            cellA.setCellValue(record.getEventName() != null ? record.getEventName() : "");
+            cellA.setCellStyle(dataStyle);
+
+            // C: 选手及成绩
+            org.apache.poi.ss.usermodel.Cell cellC = row.createCell(2);
+            cellC.setCellValue(formatSportsParticipants(record));
+            cellC.setCellStyle(dataStyle);
+        }
+
+        int dataEndRow = rowIdx - 1;
+
+        // ========== 右侧：个人得分汇总 ==========
+        int personRow = dataStartRow;
+        for (Map.Entry<String, BigDecimal> entry : sortedPersons) {
+            org.apache.poi.ss.usermodel.Row row;
+            if (personRow <= dataEndRow) {
+                row = sheet.getRow(personRow);
+                if (row == null) row = sheet.createRow(personRow);
+            } else {
+                row = sheet.createRow(personRow);
+            }
+
+            // G: 姓名
+            org.apache.poi.ss.usermodel.Cell cellG = row.createCell(6);
+            cellG.setCellValue(entry.getKey());
+            cellG.setCellStyle(dataStyle);
+
+            // H: 业绩分
+            org.apache.poi.ss.usermodel.Cell cellH = row.createCell(7);
+            cellH.setCellValue(entry.getValue().stripTrailingZeros().toPlainString());
+            cellH.setCellStyle(dataStyle);
+
+            personRow++;
+        }
+
+        rowIdx = Math.max(rowIdx, personRow);
+
+        // ========== 空行 + 注释 ==========
+        rowIdx++;
+        org.apache.poi.ss.usermodel.Row noteRow1 = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell noteCell1 = noteRow1.createCell(0);
+        noteCell1.setCellValue("注");
+        noteCell1.setCellStyle(noteStyle);
+
+        org.apache.poi.ss.usermodel.Row noteRow2 = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell noteCell2 = noteRow2.createCell(0);
+        noteCell2.setCellValue("参加运动会及球类项目：1分/项类");
+        noteCell2.setCellStyle(noteStyle);
+
+        org.apache.poi.ss.usermodel.Row noteRow3 = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell noteCell3 = noteRow3.createCell(0);
+        noteCell3.setCellValue("获奖增加：运动会前四名 1分/项；后四名 0.5分/项；球类 1.5分/项");
+        noteCell3.setCellStyle(noteStyle);
+
+        // 设置行高
+        for (int i = 0; i < rowIdx; i++) {
+            org.apache.poi.ss.usermodel.Row r = sheet.getRow(i);
+            if (r != null) {
+                r.setHeight((short) (22 * 20));
+            }
+        }
+        titleRow.setHeight((short) (30 * 20));
+    }
+
+    /**
+     * 格式化体育比赛参与者信息为显示字符串。
+     * 格式：姓名第N名(得分)、姓名(得分)...
+     */
+    private String formatSportsParticipants(SportsEventRecord record) {
+        if (StrUtil.isBlank(record.getMemberData())) return "";
+
+        try {
+            JSONArray arr = new JSONArray(record.getMemberData());
+            if (arr.size() == 0) return "";
+
+            StringBuilder sb = new StringBuilder();
+
+            if (SportsScoringConstants.EVENT_TYPE_BALL_GAME.equals(record.getEventType())) {
+                // 球类项目：列出所有参与者
+                BigDecimal perScore = SportsScoringConstants.calcBallGameScore(record.getEventResult());
+                String scoreStr = perScore.stripTrailingZeros().toPlainString();
+
+                for (int i = 0; i < arr.size(); i++) {
+                    if (i > 0) sb.append("、");
+                    JSONObject entry = arr.getJSONObject(i);
+                    sb.append(entry.getStr("teacherName", ""));
+                }
+
+                String resultText = SportsScoringConstants.getEventResultText(record.getEventResult());
+                if (StrUtil.isNotBlank(resultText)) {
+                    sb.append("（").append(resultText);
+                    sb.append("，").append(scoreStr).append("）");
+                }
+            } else {
+                // 运动会项目：每人独立显示名次和得分
+                for (int i = 0; i < arr.size(); i++) {
+                    if (i > 0) sb.append("、");
+                    JSONObject entry = arr.getJSONObject(i);
+                    String name = entry.getStr("teacherName", "");
+                    sb.append(name);
+
+                    Integer placement = entry.getInt("placement");
+                    if (placement != null && placement > 0) {
+                        sb.append("第").append(placement).append("名");
+                    }
+
+                    BigDecimal score = SportsScoringConstants.calcTrackFieldScore(
+                            (placement != null && placement > 0) ? placement : null);
+                    sb.append("(").append(score.stripTrailingZeros().toPlainString()).append(")");
+                }
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("格式化体育比赛参与者信息失败: {}", record.getMemberData(), e);
+            return record.getMemberData();
         }
     }
 
