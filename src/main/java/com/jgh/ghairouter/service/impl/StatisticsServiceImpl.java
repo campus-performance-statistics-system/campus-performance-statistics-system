@@ -6,6 +6,7 @@ import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.InnovationEntrepreneurshipRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper;
+import com.jgh.ghairouter.mapper.RecommendedEmploymentRecordMapper;
 import com.jgh.ghairouter.mapper.ResearchAchievementRecordMapper;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TeacherCompetitionRecordMapper;
@@ -17,6 +18,7 @@ import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
 import com.jgh.ghairouter.model.entity.PartTimeClassAdvisorRecord;
+import com.jgh.ghairouter.model.entity.RecommendedEmploymentRecord;
 import com.jgh.ghairouter.model.entity.ResearchAchievementRecord;
 import com.jgh.ghairouter.model.entity.SportsEventRecord;
 import com.jgh.ghairouter.model.entity.StudentCompetitionRecord;
@@ -90,6 +92,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     private PartTimeClassAdvisorScoreMapper partTimeAdvisorScoreMapper;
 
     @Resource
+    private RecommendedEmploymentRecordMapper recommendedEmploymentRecordMapper;
+
+    @Resource
     private UserMapper userMapper;
 
     // ==================== 各分类服务（用于统一Excel导出） ====================
@@ -115,6 +120,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     private InvigilationRecordService invigilationRecordService;
     @Resource
     private OnlineEvaluationRecordService onlineEvaluationRecordService;
+
+    @Resource
+    private RecommendedEmploymentRecordService recommendedEmploymentRecordService;
 
     /**
      * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
@@ -625,6 +633,34 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
+            // ---- 推荐学院学生签约就业（v13） ----
+            List<RecommendedEmploymentRecord> recommendedEmploymentRecords = recommendedEmploymentRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (RecommendedEmploymentRecord record : recommendedEmploymentRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String teacherName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getTeacherName())
+                                ? record.getTeacherName() : "未知教师");
+                String companyName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getCompanyName())
+                                ? "-" + record.getCompanyName() : "");
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + teacherName + companyName + "-" + userName + ".png";
+                String zipPath = "所有附件/推荐学院学生签约就业/" + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
             zos.finish();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "附件压缩包生成失败: " + e.getMessage());
@@ -684,6 +720,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             copySheetFromService(combinedWorkbook, () -> advisorRecordService.exportRecordsToExcel(), "9-兼职班主任");
             copySheetFromService(combinedWorkbook, () -> invigilationRecordService.exportRecordsToExcel(), "10-监考次数统计");
             copySheetFromService(combinedWorkbook, () -> onlineEvaluationRecordService.exportRecordsToExcel(), "11-网上评教");
+            copySheetFromService(combinedWorkbook, () -> recommendedEmploymentRecordService.exportRecordsToExcel(), "12-推荐学院学生签约就业");
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             combinedWorkbook.write(bos);

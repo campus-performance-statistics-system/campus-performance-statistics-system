@@ -484,4 +484,24 @@ CREATE TABLE IF NOT EXISTS online_evaluation_record
     INDEX idx_academic_year (academic_year)
 ) COMMENT '网上评教记录' COLLATE utf8mb4_unicode_ci;
 
+-- ===================== 推荐学院学生签约就业记录表（v13） =====================
+DROP TABLE IF EXISTS recommended_employment_record;
+CREATE TABLE IF NOT EXISTS recommended_employment_record
+(
+    id                  BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name           VARCHAR(64)   DEFAULT '推荐学院学生签约就业' NOT NULL COMMENT '记录类型名称',
+    user_id             BIGINT                                NOT NULL COMMENT '填报用户ID',
+    teacher_name        VARCHAR(128)                          NOT NULL COMMENT '联系人（教师姓名）',
+    company_name        VARCHAR(512)                          NOT NULL COMMENT '单位名称',
+    contract_count      INT           DEFAULT 0               NOT NULL COMMENT '签约数',
+    recommendation_time VARCHAR(128)                          NULL COMMENT '推荐时间（如2023年3月）',
+    proof_image_data    LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete           TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '推荐学院学生签约就业记录' COLLATE utf8mb4_unicode_ci;
+
 
