@@ -355,3 +355,43 @@ CREATE TABLE IF NOT EXISTS thesis_score
     INDEX idx_user_id (user_id),
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '论文业绩得分明细' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 体育比赛业绩记录表（v9） =====================
+DROP TABLE IF EXISTS sports_event_record;
+CREATE TABLE IF NOT EXISTS sports_event_record
+(
+    id                BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name         VARCHAR(64)   DEFAULT '体育比赛业绩' NOT NULL COMMENT '记录类型名称',
+    user_id           BIGINT                                NOT NULL COMMENT '填报用户ID',
+    event_name        VARCHAR(255)                          NOT NULL COMMENT '比赛项目名称',
+    event_type        VARCHAR(32)                           NOT NULL COMMENT '项目类型：track_field-运动会项目, ball_game-球类项目',
+    event_result      VARCHAR(32)                           NULL COMMENT '球类项目结果：champion-冠军, placed-获奖, participated-参与',
+    member_data       TEXT                                  NULL COMMENT '参与教师及名次JSON数组',
+    score_data        TEXT                                  NULL COMMENT '得分明细JSON数组',
+    proof_image_data  LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete         TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_event_type (event_type),
+    INDEX idx_event_name (event_name)
+) COMMENT '体育比赛业绩记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 体育比赛业绩得分明细表（v9） =====================
+DROP TABLE IF EXISTS sports_event_score;
+CREATE TABLE IF NOT EXISTS sports_event_score
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id    BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id      BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score        DECIMAL(6,3) NOT NULL COMMENT '得分',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete    TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '体育比赛业绩得分明细' COLLATE utf8mb4_unicode_ci;
+
+

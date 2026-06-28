@@ -75,6 +75,8 @@ public class TeacherCompetitionRecordServiceImpl
     private InnovationEntrepreneurshipScoreMapper innovationScoreMapper;
     @Resource
     private com.jgh.ghairouter.mapper.TeachingReformRecordMapper teachingReformRecordMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.ThesisRecordMapper thesisRecordMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -940,6 +942,9 @@ public class TeacherCompetitionRecordServiceImpl
             // ========== Sheet 6：教改科研项目业绩（v7） ==========
             writeTeachingReformSheet(workbook, headerStyle);
 
+            // ========== Sheet 7：论文业绩（v8） ==========
+            writeThesisSheet(workbook, headerStyle);
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -1126,6 +1131,13 @@ public class TeacherCompetitionRecordServiceImpl
         return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
     }
 
+    /** 根据用户ID获取用户名 */
+    private String getUserName(Long userId) {
+        if (userId == null) return "";
+        User user = userMapper.selectOneById(userId);
+        return user != null && StrUtil.isNotBlank(user.getUserName()) ? user.getUserName() : "";
+    }
+
     /**
      * 格式化指导实训教师姓名（用于导出Excel）
      * 例如：[{"teacherName":"秦小旭"},{"teacherName":"方锦文"}] → "秦小旭（2）、方锦文（2）"
@@ -1280,6 +1292,169 @@ public class TeacherCompetitionRecordServiceImpl
         } catch (Exception e) {
             log.error("格式化教改科研项目成员得分失败: {}", memberData, e);
             return memberData;
+        }
+    }
+
+    // ==================== 论文业绩 Sheet 7 ====================
+
+    /**
+     * 写入论文业绩Sheet（v8），严格参照Excel示例格式。
+     */
+    private void writeThesisSheet(org.apache.poi.xssf.usermodel.XSSFWorkbook workbook,
+                                  org.apache.poi.ss.usermodel.CellStyle headerStyle) {
+        org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("7-论文业绩");
+
+        // 标题样式
+        org.apache.poi.ss.usermodel.CellStyle titleStyle = workbook.createCellStyle();
+        org.apache.poi.ss.usermodel.Font titleFont = workbook.createFont();
+        titleFont.setBold(true);
+        titleFont.setFontHeightInPoints((short) 14);
+        titleStyle.setFont(titleFont);
+        titleStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+        titleStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+
+        // 注脚样式
+        org.apache.poi.ss.usermodel.CellStyle noteStyle = workbook.createCellStyle();
+        noteStyle.setWrapText(true);
+
+        String[] headers = {"序号", "论文名称", "发表刊物", "论文等级", "作者", "", "姓名", "业绩分"};
+        int colCount = headers.length;
+
+        List<ThesisRecord> allRecords = thesisRecordMapper.selectListByQuery(
+                QueryWrapper.create().orderBy("create_time", true));
+
+        int rowIdx = 0;
+
+        // ========== 标题行 ==========
+        org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIdx++);
+        org.apache.poi.ss.usermodel.Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("2023年信息工程学院论文工作量统计表（教务汇总）");
+        titleCell.setCellStyle(titleStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(
+                rowIdx - 1, rowIdx - 1, 0, colCount - 1));
+
+        // ========== 表头行 ==========
+        org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(rowIdx++);
+        for (int i = 0; i < headers.length; i++) {
+            org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        // ========== 数据行 ==========
+        int seq = 1;
+        for (ThesisRecord record : allRecords) {
+            org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+            row.createCell(0).setCellValue(seq++);
+            row.createCell(1).setCellValue(record.getThesisName() != null ? record.getThesisName() : "");
+            row.createCell(2).setCellValue(record.getJournalName() != null ? record.getJournalName() : "");
+            row.createCell(3).setCellValue(
+                    com.jgh.ghairouter.model.constants.ThesisScoringConstants.getLevelText(record.getThesisLevel()));
+            row.createCell(4).setCellValue(formatThesisAuthorsScores(record.getAuthorsData(), record.getThesisLevel()));
+            row.createCell(5).setCellValue("");
+            row.createCell(6).setCellValue(getUserName(record.getUserId()));
+            row.createCell(7).setCellValue(formatThesisSubmitterScore(record));
+        }
+
+        // ========== 空行和注脚 ==========
+        rowIdx += 3;
+        org.apache.poi.ss.usermodel.Row noteRow = sheet.createRow(rowIdx);
+        org.apache.poi.ss.usermodel.Cell noteCell = noteRow.createCell(0);
+        noteCell.setCellValue("注： 发表论文: 一级 12分/篇；二级 9分/篇；三级 6分/篇；四级 3分/篇    \n"
+                + "两人完成，按7:3分配；三人完成，按6:2:2分配；四人及以上完成，主持者分配 50%；参与者平均分配 50%");
+        noteCell.setCellStyle(noteStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(
+                rowIdx, rowIdx, 0, colCount - 1));
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    /**
+     * 格式化论文作者及得分为显示字符串。
+     * 格式：作者名得分、作者名得分...
+     */
+    private String formatThesisAuthorsScores(String authorsData, String thesisLevel) {
+        if (StrUtil.isBlank(authorsData)) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(authorsData);
+            int authorCount = arr.size();
+            if (authorCount == 0) return "";
+
+            BigDecimal totalScore = com.jgh.ghairouter.model.constants.ThesisScoringConstants
+                    .calcThesisScore(thesisLevel);
+            if (totalScore.compareTo(BigDecimal.ZERO) <= 0) return "";
+
+            int firstAuthorIndex = -1;
+            for (int i = 0; i < arr.size(); i++) {
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                if (entry.getBool("isFirstAuthor", false)) {
+                    firstAuthorIndex = i;
+                    break;
+                }
+            }
+
+            List<BigDecimal> distributed = com.jgh.ghairouter.model.constants.ThesisScoringConstants
+                    .distributeScore(totalScore, authorCount, firstAuthorIndex);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.size(); i++) {
+                if (i > 0) sb.append("，");
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                sb.append(name);
+                sb.append(distributed.get(i).stripTrailingZeros().toPlainString());
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("格式化论文作者得分失败: {}", authorsData, e);
+            return authorsData;
+        }
+    }
+
+    /**
+     * 获取提交人在该论文中的得分。
+     */
+    private String formatThesisSubmitterScore(ThesisRecord record) {
+        if (StrUtil.isBlank(record.getAuthorsData())) return "";
+        try {
+            cn.hutool.json.JSONArray arr = new cn.hutool.json.JSONArray(record.getAuthorsData());
+            int authorCount = arr.size();
+            if (authorCount == 0) return "";
+
+            BigDecimal totalScore = com.jgh.ghairouter.model.constants.ThesisScoringConstants
+                    .calcThesisScore(record.getThesisLevel());
+            if (totalScore.compareTo(BigDecimal.ZERO) <= 0) return "";
+
+            int firstAuthorIndex = -1;
+            for (int i = 0; i < arr.size(); i++) {
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                if (entry.getBool("isFirstAuthor", false)) {
+                    firstAuthorIndex = i;
+                    break;
+                }
+            }
+
+            List<BigDecimal> distributed = com.jgh.ghairouter.model.constants.ThesisScoringConstants
+                    .distributeScore(totalScore, authorCount, firstAuthorIndex);
+
+            String submitterName = getUserName(record.getUserId());
+            BigDecimal submitterTotal = BigDecimal.ZERO;
+            for (int i = 0; i < arr.size(); i++) {
+                cn.hutool.json.JSONObject entry = arr.getJSONObject(i);
+                String name = entry.getStr("teacherName", "");
+                if (submitterName.equals(name)) {
+                    submitterTotal = submitterTotal.add(distributed.get(i));
+                }
+            }
+            if (submitterTotal.compareTo(BigDecimal.ZERO) > 0) {
+                return submitterTotal.stripTrailingZeros().toPlainString();
+            }
+            return "";
+        } catch (Exception e) {
+            log.error("格式化提交人得分失败", e);
+            return "";
         }
     }
 }
