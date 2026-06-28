@@ -10,6 +10,7 @@ import com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper;
 import com.jgh.ghairouter.mapper.CooperativeEnterpriseRecordMapper;
 import com.jgh.ghairouter.mapper.RecommendedEmploymentRecordMapper;
+import com.jgh.ghairouter.mapper.YoungTeacherGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.ResearchAchievementRecordMapper;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TeacherCompetitionRecordMapper;
@@ -20,6 +21,7 @@ import com.jgh.ghairouter.mapper.ThesisRecordMapper;
 import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.CooperativeEnterpriseRecord;
+import com.jgh.ghairouter.model.entity.YoungTeacherGuidanceRecord;
 import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
 import com.jgh.ghairouter.model.entity.InvigilationRecord;
 import com.jgh.ghairouter.model.entity.OnlineEvaluationRecord;
@@ -104,6 +106,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     private CooperativeEnterpriseRecordMapper cooperativeEnterpriseRecordMapper;
 
     @Resource
+    private YoungTeacherGuidanceRecordMapper youngTeacherGuidanceRecordMapper;
+
+    @Resource
     private InvigilationRecordMapper invigilationRecordMapper;
 
     @Resource
@@ -141,6 +146,9 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private CooperativeEnterpriseRecordService cooperativeEnterpriseRecordService;
+
+    @Resource
+    private YoungTeacherGuidanceRecordService youngTeacherGuidanceRecordService;
 
     /**
      * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
@@ -790,6 +798,35 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
+            // ---- 14-指导青年教师 ----
+            String dir14 = "所有附件/14-指导青年教师/";
+            ensureZipDir(zos, dir14);
+            List<YoungTeacherGuidanceRecord> youngTeacherGuidanceRecords = youngTeacherGuidanceRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (YoungTeacherGuidanceRecord record : youngTeacherGuidanceRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String youngTeacherName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getYoungTeacherName())
+                                ? record.getYoungTeacherName() : "未知青年教师");
+                String mentorNames = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getMentorNames())
+                                ? record.getMentorNames() : "未知指导教师");
+                String fileName = seq + "-" + mentorNames + "-" + youngTeacherName + ".png";
+                String zipPath = dir14 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
             zos.finish();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "附件压缩包生成失败: " + e.getMessage());
@@ -861,6 +898,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             copySheetFromService(combinedWorkbook, () -> onlineEvaluationRecordService.exportRecordsToExcel(), "11-网上评教");
             copySheetFromService(combinedWorkbook, () -> recommendedEmploymentRecordService.exportRecordsToExcel(), "12-推荐学院学生签约就业");
             copySheetFromService(combinedWorkbook, () -> cooperativeEnterpriseRecordService.exportRecordsToExcel(), "13-签订合作企业");
+            copySheetFromService(combinedWorkbook, () -> youngTeacherGuidanceRecordService.exportRecordsToExcel(), "14-指导青年教师");
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             combinedWorkbook.write(bos);

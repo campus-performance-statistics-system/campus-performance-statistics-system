@@ -527,3 +527,28 @@ CREATE TABLE IF NOT EXISTS cooperative_enterprise_record
     INDEX idx_enterprise_name (enterprise_name)
 ) COMMENT '签订合作企业记录' COLLATE utf8mb4_unicode_ci;
 
+-- ----------------------------
+-- v15：指导青年教师
+-- ----------------------------
+DROP TABLE IF EXISTS young_teacher_guidance_record;
+CREATE TABLE IF NOT EXISTS young_teacher_guidance_record
+(
+    id                      BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name               VARCHAR(64)   DEFAULT '指导青年教师'       NOT NULL COMMENT '记录类型名称',
+    user_id                 BIGINT                                NOT NULL COMMENT '填报用户ID',
+    college                 VARCHAR(256)                          NOT NULL COMMENT '教学单位（学院）',
+    mentor_names            VARCHAR(512)                          NOT NULL COMMENT '指导教师-姓名（多个用、分隔）',
+    mentor_titles           VARCHAR(512)                          NOT NULL COMMENT '指导教师-职称（多个用、分隔，与姓名一一对应）',
+    young_teacher_name      VARCHAR(128)                          NOT NULL COMMENT '青年教师-姓名',
+    young_teacher_entry_time VARCHAR(32)                          NULL COMMENT '青年教师-入职时间（格式YYYY.MM）',
+    proof_image_data        LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time             DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time             DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete               TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_college (college),
+    INDEX idx_mentor_names (mentor_names(191)),
+    INDEX idx_young_teacher_name (young_teacher_name)
+) COMMENT '指导青年教师记录' COLLATE utf8mb4_unicode_ci;
+
