@@ -247,6 +247,11 @@ public class OnlineEvaluationRecordServiceImpl
             // 数据样式：宋体、14号、居中、thin边框
             CellStyle dataStyle = createDataStyle(workbook);
 
+            // 小数数据样式：在数据样式基础上增加两位小数格式
+            CellStyle decimalStyle = workbook.createCellStyle();
+            decimalStyle.cloneStyleFrom(dataStyle);
+            decimalStyle.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+
             // 注意样式：宋体、14号、left对齐
             CellStyle noteStyle = workbook.createCellStyle();
             Font noteFont = workbook.createFont();
@@ -437,13 +442,13 @@ public class OnlineEvaluationRecordServiceImpl
                             avgCell.setCellValue(r.getAverageScore() != null ? r.getAverageScore().doubleValue() : 0);
                             avgCell.setCellStyle(dataStyle);
 
-                            // 个人总平均分（仅第一行，使用公式）
+                            // 个人总平均分（仅第一行，使用公式，保留两位小数）
                             Cell totalAvgCell = dataRow.createCell(6);
                             if (firstRow && teacherRecords.size() > 1) {
-                                // 使用Excel公式计算加权平均
+                                // 使用Excel公式计算加权平均，ROUND 保留两位小数
                                 // rowIdx 在 createRow(rowIdx++) 后已指向下一行，
                                 // 当前教师的第 j 条记录在第 (rowIdx + j) 个 Excel 行号
-                                StringBuilder formula = new StringBuilder("(");
+                                StringBuilder formula = new StringBuilder("ROUND((");
                                 for (int j = 0; j < teacherRecords.size(); j++) {
                                     if (j > 0) formula.append("+");
                                     int rowNum = rowIdx + j;
@@ -455,12 +460,12 @@ public class OnlineEvaluationRecordServiceImpl
                                     int rowNum = rowIdx + j;
                                     formula.append("E").append(rowNum);
                                 }
-                                formula.append(")");
+                                formula.append("),2)");
                                 totalAvgCell.setCellFormula(formula.toString());
                             } else if (firstRow) {
                                 totalAvgCell.setCellValue(weightedAvg.doubleValue());
                             }
-                            totalAvgCell.setCellStyle(dataStyle);
+                            totalAvgCell.setCellStyle(decimalStyle);
 
                             firstRow = false;
                         }
