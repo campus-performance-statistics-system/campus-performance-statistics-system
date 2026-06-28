@@ -699,15 +699,22 @@ public class StatisticsServiceImpl implements StatisticsService {
     private void copySheetFromService(XSSFWorkbook combined, java.util.function.Supplier<byte[]> exportFunc, String sheetName) {
         try {
             byte[] data = exportFunc.get();
-            if (data == null || data.length == 0) return;
+            if (data == null || data.length == 0) {
+                log.warn("导出数据为空: sheetName={}", sheetName);
+                return;
+            }
             try (Workbook sourceWorkbook = WorkbookFactory.create(new ByteArrayInputStream(data))) {
                 Sheet sourceSheet = sourceWorkbook.getSheetAt(0);
-                if (sourceSheet == null) return;
+                if (sourceSheet == null) {
+                    log.warn("源Sheet为空: sheetName={}", sheetName);
+                    return;
+                }
                 Sheet newSheet = combined.createSheet(sheetName);
                 copySheet(sourceSheet, newSheet);
+                log.info("Sheet复制成功: sheetName={}, rows={}", sheetName, sourceSheet.getLastRowNum() + 1);
             }
         } catch (Exception e) {
-            log.warn("复制Sheet失败: sheetName={}, error={}", sheetName, e.getMessage());
+            log.error("复制Sheet失败: sheetName={}, error={}", sheetName, e.getMessage(), e);
         }
     }
 

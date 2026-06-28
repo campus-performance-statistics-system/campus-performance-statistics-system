@@ -536,8 +536,7 @@ public class PartTimeClassAdvisorRecordServiceImpl
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 4, 5));   // E3:F3 安全教育
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 6, 7));   // G3:H3 后进生帮扶
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 8, 10));  // I3:K3 育人成果
-            sheet.addMergedRegion(new CellRangeAddress(2, 2, 11, 11)); // L3 总得分
-            sheet.addMergedRegion(new CellRangeAddress(2, 2, 12, 12)); // M3 换算最终得分
+            // 注意：L3(总得分)和M3(换算最终得分)是单行单列的表头，不需要合并单元格
 
             // N3-R3 headers
             Cell hN3 = headerRow1.createCell(13);
