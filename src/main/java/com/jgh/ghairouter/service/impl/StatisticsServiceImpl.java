@@ -4,6 +4,8 @@ import cn.hutool.core.util.StrUtil;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.InnovationEntrepreneurshipRecordMapper;
+import com.jgh.ghairouter.mapper.InvigilationRecordMapper;
+import com.jgh.ghairouter.mapper.OnlineEvaluationRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper;
 import com.jgh.ghairouter.mapper.CooperativeEnterpriseRecordMapper;
@@ -17,9 +19,11 @@ import com.jgh.ghairouter.mapper.TeachingReformRecordMapper;
 import com.jgh.ghairouter.mapper.ThesisRecordMapper;
 import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
-import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
-import com.jgh.ghairouter.model.entity.PartTimeClassAdvisorRecord;
 import com.jgh.ghairouter.model.entity.CooperativeEnterpriseRecord;
+import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
+import com.jgh.ghairouter.model.entity.InvigilationRecord;
+import com.jgh.ghairouter.model.entity.OnlineEvaluationRecord;
+import com.jgh.ghairouter.model.entity.PartTimeClassAdvisorRecord;
 import com.jgh.ghairouter.model.entity.RecommendedEmploymentRecord;
 import com.jgh.ghairouter.model.entity.ResearchAchievementRecord;
 import com.jgh.ghairouter.model.entity.SportsEventRecord;
@@ -98,6 +102,12 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private CooperativeEnterpriseRecordMapper cooperativeEnterpriseRecordMapper;
+
+    @Resource
+    private InvigilationRecordMapper invigilationRecordMapper;
+
+    @Resource
+    private OnlineEvaluationRecordMapper onlineEvaluationRecordMapper;
 
     @Resource
     private UserMapper userMapper;
@@ -409,7 +419,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(bos)) {
 
-            // ---- 教师获奖 ----
+            // ---- 1-教师获奖 ----
+            String dir1 = "所有附件/1-教师获奖/";
+            ensureZipDir(zos, dir1);
             List<TeacherCompetitionRecord> teacherRecords = teacherRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             int seq = 1;
@@ -422,7 +434,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getCompetitionName() : "未知比赛");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + competitionName + "-" + userName + ".png";
-                String zipPath = "所有附件/教师获奖/" + fileName;
+                String zipPath = dir1 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -434,7 +446,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 指导学生科技竞赛 ----
+            // ---- 2-指导学生科技竞赛 ----
+            String dir2 = "所有附件/2-指导学生科技竞赛/";
+            ensureZipDir(zos, dir2);
             List<StudentCompetitionRecord> studentRecords = studentRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -449,7 +463,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         ? "-" + sanitizeFilename(record.getCompetitionTopic()) : "";
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + competitionName + topic + "-" + userName + ".png";
-                String zipPath = "所有附件/指导学生科技竞赛/" + fileName;
+                String zipPath = dir2 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -461,32 +475,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 科研及教材业绩 ----
-            List<ResearchAchievementRecord> researchRecords = researchRecordMapper.selectListByQuery(
-                    QueryWrapper.create().orderBy("create_time", true));
-            seq = 1;
-            for (ResearchAchievementRecord record : researchRecords) {
-                if (StrUtil.isBlank(record.getProofImageData())) {
-                    continue;
-                }
-                String achievementName = sanitizeFilename(
-                        StrUtil.isNotBlank(record.getAchievementName())
-                                ? record.getAchievementName() : "未知成果");
-                String userName = sanitizeFilename(getUserName(record.getUserId()));
-                String fileName = seq + "-" + achievementName + "-" + userName + ".png";
-                String zipPath = "所有附件/科研及教材业绩/" + fileName;
-
-                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
-                if (imageBytes == null) continue;
-
-                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
-                zos.putNextEntry(entry);
-                zos.write(imageBytes);
-                zos.closeEntry();
-                seq++;
-            }
-
-            // ---- 指导实训 ----
+            // ---- 3-指导实训 ----
+            String dir3 = "所有附件/3-指导实训/";
+            ensureZipDir(zos, dir3);
             List<TrainingGuidanceRecord> trainingRecords = trainingRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -501,7 +492,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         ? "-" + sanitizeFilename(record.getSemester()) : "";
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + trainingName + semester + "-" + userName + ".png";
-                String zipPath = "所有附件/指导实训/" + fileName;
+                String zipPath = dir3 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -513,7 +504,36 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 大创业绩（v6） ----
+            // ---- 4-科研及教材业绩 ----
+            String dir4 = "所有附件/4-科研及教材业绩/";
+            ensureZipDir(zos, dir4);
+            List<ResearchAchievementRecord> researchRecords = researchRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (ResearchAchievementRecord record : researchRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String achievementName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getAchievementName())
+                                ? record.getAchievementName() : "未知成果");
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + achievementName + "-" + userName + ".png";
+                String zipPath = dir4 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 5-大创业绩 ----
+            String dir5 = "所有附件/5-大创业绩/";
+            ensureZipDir(zos, dir5);
             List<InnovationEntrepreneurshipRecord> innovationRecords = innovationRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -526,7 +546,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getProjectName() : "未知项目");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + projectName + "-" + userName + ".png";
-                String zipPath = "所有附件/大创业绩/" + fileName;
+                String zipPath = dir5 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -538,7 +558,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 教改科研项目业绩（v7） ----
+            // ---- 6-教改科研项目业绩 ----
+            String dir6 = "所有附件/6-教改科研项目业绩/";
+            ensureZipDir(zos, dir6);
             List<TeachingReformRecord> teachingReformRecords = teachingReformRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -551,7 +573,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getProjectName() : "未知项目");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + projectName + "-" + userName + ".png";
-                String zipPath = "所有附件/教改科研项目业绩/" + fileName;
+                String zipPath = dir6 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -563,7 +585,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 论文业绩（v8） ----
+            // ---- 7-论文业绩 ----
+            String dir7 = "所有附件/7-论文业绩/";
+            ensureZipDir(zos, dir7);
             List<ThesisRecord> thesisRecords = thesisRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -576,7 +600,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getThesisName() : "未知论文");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + thesisName + "-" + userName + ".png";
-                String zipPath = "所有附件/论文业绩/" + fileName;
+                String zipPath = dir7 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -588,7 +612,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 体育比赛业绩（v9） ----
+            // ---- 8-体育比赛业绩 ----
+            String dir8 = "所有附件/8-体育比赛业绩/";
+            ensureZipDir(zos, dir8);
             List<SportsEventRecord> sportsRecords = sportsRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -601,7 +627,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getEventName() : "未知比赛项目");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + eventName + "-" + userName + ".png";
-                String zipPath = "所有附件/体育比赛业绩/" + fileName;
+                String zipPath = dir8 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -613,7 +639,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 兼职班主任（v10） ----
+            // ---- 9-兼职班主任 ----
+            String dir9 = "所有附件/9-兼职班主任/";
+            ensureZipDir(zos, dir9);
             List<PartTimeClassAdvisorRecord> advisorRecords = partTimeAdvisorRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -629,7 +657,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? "-" + record.getClassId() : "");
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + teacherName + classId + "-" + userName + ".png";
-                String zipPath = "所有附件/兼职班主任/" + fileName;
+                String zipPath = dir9 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -641,7 +669,72 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 推荐学院学生签约就业（v13） ----
+            // ---- 10-监考次数统计 ----
+            String dir10 = "所有附件/10-监考次数统计/";
+            ensureZipDir(zos, dir10);
+            List<InvigilationRecord> invigilationRecords = invigilationRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (InvigilationRecord record : invigilationRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String teacherName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getTeacherName())
+                                ? record.getTeacherName() : "未知教师");
+                String countInfo = record.getInvigilationCount() != null
+                        ? "-" + record.getInvigilationCount() + "次" : "";
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + teacherName + countInfo + "-" + userName + ".png";
+                String zipPath = dir10 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 11-网上评教 ----
+            String dir11 = "所有附件/11-网上评教/";
+            ensureZipDir(zos, dir11);
+            List<OnlineEvaluationRecord> onlineEvaluationRecords = onlineEvaluationRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (OnlineEvaluationRecord record : onlineEvaluationRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String teacherName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getTeacherName())
+                                ? record.getTeacherName() : "未知教师");
+                String yearAndSemester = "";
+                if (StrUtil.isNotBlank(record.getAcademicYear())) {
+                    yearAndSemester += "-" + sanitizeFilename(record.getAcademicYear());
+                }
+                if (StrUtil.isNotBlank(record.getSemester())) {
+                    yearAndSemester += "-" + sanitizeFilename(record.getSemester());
+                }
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + teacherName + yearAndSemester + "-" + userName + ".png";
+                String zipPath = dir11 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 12-推荐学院学生签约就业 ----
+            String dir12 = "所有附件/12-推荐学院学生签约就业/";
+            ensureZipDir(zos, dir12);
             List<RecommendedEmploymentRecord> recommendedEmploymentRecords = recommendedEmploymentRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -656,7 +749,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         StrUtil.isNotBlank(record.getCompanyName())
                                 ? record.getCompanyName() : "未知单位");
                 String fileName = seq + "-" + companyName + "-" + teacherName + ".png";
-                String zipPath = "所有附件/推荐学院学生签约就业/" + fileName;
+                String zipPath = dir12 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -668,7 +761,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 签订合作企业（v14） ----
+            // ---- 13-签订合作企业 ----
+            String dir13 = "所有附件/13-签订合作企业/";
+            ensureZipDir(zos, dir13);
             List<CooperativeEnterpriseRecord> cooperativeEnterpriseRecords = cooperativeEnterpriseRecordMapper.selectListByQuery(
                     QueryWrapper.create().orderBy("create_time", true));
             seq = 1;
@@ -683,7 +778,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         StrUtil.isNotBlank(record.getEnterpriseName())
                                 ? record.getEnterpriseName() : "未知企业");
                 String fileName = seq + "-" + enterpriseName + "-" + teacherName + ".png";
-                String zipPath = "所有附件/签订合作企业/" + fileName;
+                String zipPath = dir13 + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;
@@ -700,6 +795,16 @@ public class StatisticsServiceImpl implements StatisticsService {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "附件压缩包生成失败: " + e.getMessage());
         }
         return bos.toByteArray();
+    }
+
+    /**
+     * 确保ZIP中存在目录条目（空文件夹）。
+     * 重复调用同一个目录不会产生副作用，ZIP解压时会自动合并。
+     */
+    private void ensureZipDir(java.util.zip.ZipOutputStream zos, String dirPath) throws IOException {
+        java.util.zip.ZipEntry dirEntry = new java.util.zip.ZipEntry(dirPath);
+        zos.putNextEntry(dirEntry);
+        zos.closeEntry();
     }
 
     private String getUserName(Long userId) {
