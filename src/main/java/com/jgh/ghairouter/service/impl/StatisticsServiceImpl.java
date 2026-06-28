@@ -4,6 +4,8 @@ import cn.hutool.core.util.StrUtil;
 import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.InnovationEntrepreneurshipRecordMapper;
+import com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper;
+import com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper;
 import com.jgh.ghairouter.mapper.ResearchAchievementRecordMapper;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
 import com.jgh.ghairouter.mapper.TeacherCompetitionRecordMapper;
@@ -14,6 +16,7 @@ import com.jgh.ghairouter.mapper.ThesisRecordMapper;
 import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
+import com.jgh.ghairouter.model.entity.PartTimeClassAdvisorRecord;
 import com.jgh.ghairouter.model.entity.ResearchAchievementRecord;
 import com.jgh.ghairouter.model.entity.SportsEventRecord;
 import com.jgh.ghairouter.model.entity.StudentCompetitionRecord;
@@ -73,6 +76,12 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private SportsEventScoreMapper sportsScoreMapper;
+
+    @Resource
+    private PartTimeClassAdvisorRecordMapper partTimeAdvisorRecordMapper;
+
+    @Resource
+    private PartTimeClassAdvisorScoreMapper partTimeAdvisorScoreMapper;
 
     @Resource
     private UserMapper userMapper;
@@ -192,13 +201,27 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     /**
-     * 所有比赛总分（八类得分合并）
+     * 兼职班主任业绩总分（part_time_class_advisor_score 表）
+     */
+    private static final String ADVISOR_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              COALESCE(SUM(ascore.score), 0) AS total_score
+            FROM user u
+            INNER JOIN part_time_class_advisor_score ascore ON u.id = ascore.user_id AND ascore.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 所有比赛总分（九类得分合并）
      */
     private static final String ALL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
               u.user_name,
-              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) + COALESCE(trscore.teaching_reform_score, 0) + COALESCE(thscore.thesis_score, 0) + COALESCE(sscore.sports_score, 0) AS total_score
+              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) + COALESCE(trscore.teaching_reform_score, 0) + COALESCE(thscore.thesis_score, 0) + COALESCE(sscore.sports_score, 0) + COALESCE(advscore.advisor_score, 0) AS total_score
             FROM user u
             LEFT JOIN (
               SELECT
@@ -264,8 +287,16 @@ public class StatisticsServiceImpl implements StatisticsService {
               WHERE is_delete = 0
               GROUP BY user_id
             ) sscore ON u.id = sscore.user_id
+            LEFT JOIN (
+              SELECT
+                user_id,
+                SUM(score) AS advisor_score
+              FROM part_time_class_advisor_score
+              WHERE is_delete = 0
+              GROUP BY user_id
+            ) advscore ON u.id = advscore.user_id
             WHERE u.is_delete = 0
-              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL OR iscore.innovation_score IS NOT NULL OR trscore.teaching_reform_score IS NOT NULL OR thscore.thesis_score IS NOT NULL OR sscore.sports_score IS NOT NULL)
+              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL OR iscore.innovation_score IS NOT NULL OR trscore.teaching_reform_score IS NOT NULL OR thscore.thesis_score IS NOT NULL OR sscore.sports_score IS NOT NULL OR advscore.advisor_score IS NOT NULL)
             """;
 
     @Override
@@ -287,6 +318,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = THESIS_SCORE_SQL;
         } else if ("sports".equals(type)) {
             sql = SPORTS_SCORE_SQL;
+        } else if ("advisor".equals(type)) {
+            sql = ADVISOR_SCORE_SQL;
         } else {
             // "all" — 合并所有
             sql = ALL_SCORE_SQL;
@@ -523,6 +556,34 @@ public class StatisticsServiceImpl implements StatisticsService {
                 String userName = sanitizeFilename(getUserName(record.getUserId()));
                 String fileName = seq + "-" + eventName + "-" + userName + ".png";
                 String zipPath = "所有附件/体育比赛业绩/" + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 兼职班主任（v10） ----
+            List<PartTimeClassAdvisorRecord> advisorRecords = partTimeAdvisorRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (PartTimeClassAdvisorRecord record : advisorRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String teacherName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getTeacherName())
+                                ? record.getTeacherName() : "未知教师");
+                String classId = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getClassId())
+                                ? "-" + record.getClassId() : "");
+                String userName = sanitizeFilename(getUserName(record.getUserId()));
+                String fileName = seq + "-" + teacherName + classId + "-" + userName + ".png";
+                String zipPath = "所有附件/兼职班主任/" + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
                 if (imageBytes == null) continue;

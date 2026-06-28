@@ -9,6 +9,7 @@ import com.jgh.ghairouter.exception.BusinessException;
 import com.jgh.ghairouter.exception.ErrorCode;
 import com.jgh.ghairouter.mapper.*;
 import com.jgh.ghairouter.model.constants.InnovationScoringConstants;
+import com.jgh.ghairouter.model.constants.PartTimeClassAdvisorScoringConstants;
 import com.jgh.ghairouter.model.constants.ResearchScoringConstants;
 import com.jgh.ghairouter.model.constants.SportsScoringConstants;
 import com.jgh.ghairouter.model.dto.competition.CompetitionQueryRequest;
@@ -82,6 +83,10 @@ public class TeacherCompetitionRecordServiceImpl
     private com.jgh.ghairouter.mapper.SportsEventRecordMapper sportsRecordMapper;
     @Resource
     private com.jgh.ghairouter.mapper.SportsEventScoreMapper sportsScoreMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper partTimeAdvisorRecordMapper;
+    @Resource
+    private com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper partTimeAdvisorScoreMapper;
 
     // ==================== 分数分配规则（硬编码） ====================
 
@@ -953,6 +958,9 @@ public class TeacherCompetitionRecordServiceImpl
             // ========== Sheet 8：体育比赛业绩（v9） ==========
             writeSportsEventSheet(workbook, headerStyle);
 
+            // ========== Sheet 9：兼职班主任（v10） ==========
+            writePartTimeClassAdvisorSheet(workbook, headerStyle);
+
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
             return bos.toByteArray();
@@ -1665,5 +1673,267 @@ public class TeacherCompetitionRecordServiceImpl
             log.error("格式化提交人得分失败", e);
             return "";
         }
+    }
+
+    // ==================== Sheet 9：兼职班主任（v10） ====================
+    private void writePartTimeClassAdvisorSheet(org.apache.poi.xssf.usermodel.XSSFWorkbook workbook,
+                                                 org.apache.poi.ss.usermodel.CellStyle headerStyle) {
+        org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("9-兼职班主任");
+
+        // 标题样式
+        org.apache.poi.ss.usermodel.CellStyle titleStyle = workbook.createCellStyle();
+        org.apache.poi.ss.usermodel.Font titleFont = workbook.createFont();
+        titleFont.setBold(true);
+        titleFont.setFontHeightInPoints((short) 14);
+        titleStyle.setFont(titleFont);
+        titleStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+        titleStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+
+        // 注释样式
+        org.apache.poi.ss.usermodel.CellStyle noteStyle = workbook.createCellStyle();
+        noteStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+        noteStyle.setWrapText(true);
+        org.apache.poi.ss.usermodel.Font noteFont = workbook.createFont();
+        noteFont.setFontHeightInPoints((short) 10);
+        noteStyle.setFont(noteFont);
+
+        // 数据样式
+        org.apache.poi.ss.usermodel.CellStyle dataStyle = workbook.createCellStyle();
+        dataStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+        dataStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+        dataStyle.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        dataStyle.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        dataStyle.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        dataStyle.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+
+        // 设置列宽（与示例文件一致）
+        sheet.setColumnWidth(0, (int) (15.44 * 256));   // A: 姓名
+        sheet.setColumnWidth(1, (int) (11.11 * 256));   // B: 负责班级
+        sheet.setColumnWidth(2, (int) (8.44 * 256));    // C: 学风建设-工作要求
+        sheet.setColumnWidth(3, (int) (8.11 * 256));    // D: 效果评估
+        sheet.setColumnWidth(4, (int) (8.66 * 256));    // E: 安全教育-工作要求
+        sheet.setColumnWidth(5, (int) (8.33 * 256));    // F: 效果评估
+        sheet.setColumnWidth(6, (int) (13.00 * 256));   // G: 后进生帮扶-工作要求
+        sheet.setColumnWidth(7, (int) (8.44 * 256));    // H: 效果评估
+        sheet.setColumnWidth(8, (int) (9.00 * 256));    // I: 安全稳定
+        sheet.setColumnWidth(9, (int) (9.78 * 256));    // J: 学风建设
+        sheet.setColumnWidth(10, (int) (9.66 * 256));   // K: 后进生帮扶
+        sheet.setColumnWidth(11, (int) (5.89 * 256));   // L: 总得分
+        sheet.setColumnWidth(12, (int) (12.22 * 256));  // M: 换算最终得分
+        sheet.setColumnWidth(13, (int) (12.22 * 256));  // N: 合计
+        sheet.setColumnWidth(14, (int) (13.00 * 256));  // O: 平均分
+        sheet.setColumnWidth(15, (int) (13.00 * 256));  // P: 平均分折合分
+        sheet.setColumnWidth(16, (int) (13.00 * 256));  // Q: 行政班分
+        sheet.setColumnWidth(17, (int) (12.22 * 256));  // R: 总分
+
+        // 获取所有审核通过的记录，按教师姓名分组
+        List<PartTimeClassAdvisorRecord> allRecords = partTimeAdvisorRecordMapper.selectListByQuery(
+                QueryWrapper.create().orderBy("teacher_name", true).orderBy("class_id", true));
+
+        Map<String, List<PartTimeClassAdvisorRecord>> teacherGroups = new LinkedHashMap<>();
+        for (PartTimeClassAdvisorRecord r : allRecords) {
+            String name = r.getTeacherName();
+            teacherGroups.computeIfAbsent(name, k -> new ArrayList<>()).add(r);
+        }
+
+        String year = String.valueOf(java.time.Year.now().getValue());
+        int rowIdx = 0;
+
+        // ========== 第1行：标题 ==========
+        org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIdx++);
+        titleRow.setHeight((short) (18 * 20));
+        org.apache.poi.ss.usermodel.Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(year + "年度信息工程学院兼职班主任考核评分表");
+        titleCell.setCellStyle(titleStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 12));
+
+        // ========== 第2行：分值转换标准说明 ==========
+        org.apache.poi.ss.usermodel.Row noteRow = sheet.createRow(rowIdx++);
+        noteRow.setHeight((short) (44 * 20));
+        org.apache.poi.ss.usermodel.Cell noteCell = noteRow.createCell(0);
+        noteCell.setCellValue("分值转换标准：0至50━0分；51至60━1分；61至70━2分；71至80━3分，81至90━4分；91至100━5分。每带一个行政班有1分，然后总得分+行政班分得最终分（新生和毕业班需除2）。\n");
+        noteCell.setCellStyle(noteStyle);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(1, 1, 0, 12));
+
+        // ========== 第3行：一级表头 ==========
+        org.apache.poi.ss.usermodel.Row headerRow1 = sheet.createRow(rowIdx++);
+        headerRow1.setHeight((short) (18 * 20));
+
+        createHeaderCell(headerRow1, 0, "姓名", headerStyle);
+        createHeaderCell(headerRow1, 1, "负责班级", headerStyle);
+        createHeaderCell(headerRow1, 2, "学风建设（30分）", headerStyle);
+        createHeaderCell(headerRow1, 4, "安全教育（30分）", headerStyle);
+        createHeaderCell(headerRow1, 6, "后进生帮扶（30分）", headerStyle);
+        createHeaderCell(headerRow1, 8, "育人成果附加分（10分）", headerStyle);
+        createHeaderCell(headerRow1, 11, "总得分", headerStyle);
+        createHeaderCell(headerRow1, 12, "换算最终得分", headerStyle);
+        // N3-R3 留空
+        for (int c = 13; c <= 17; c++) {
+            createHeaderCell(headerRow1, c, "", headerStyle);
+        }
+
+        // 合并一级表头
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 3, 1, 1));   // B3:B4
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, 2, 3));   // C3:D3
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, 4, 5));   // E3:F3
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, 6, 7));   // G3:H3
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, 8, 10));  // I3:K3
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 3, 0, 0));   // A3:A4
+
+        // ========== 第4行：二级表头 ==========
+        org.apache.poi.ss.usermodel.Row headerRow2 = sheet.createRow(rowIdx++);
+        headerRow2.setHeight((short) (28 * 20));
+
+        createHeaderCell(headerRow2, 0, "", headerStyle);
+        createHeaderCell(headerRow2, 1, "", headerStyle);
+        createHeaderCell(headerRow2, 2, "工作要求（20分）", headerStyle);
+        createHeaderCell(headerRow2, 3, "效果评估（10分）", headerStyle);
+        createHeaderCell(headerRow2, 4, "工作要求（20分）", headerStyle);
+        createHeaderCell(headerRow2, 5, "效果评估（10分）", headerStyle);
+        createHeaderCell(headerRow2, 6, "工作要求（20分）", headerStyle);
+        createHeaderCell(headerRow2, 7, "效果评估（10分）", headerStyle);
+        createHeaderCell(headerRow2, 8, "安全稳定（3分）", headerStyle);
+        createHeaderCell(headerRow2, 9, "学风建设（3分）", headerStyle);
+        createHeaderCell(headerRow2, 10, "后进生帮扶（4分）", headerStyle);
+        createHeaderCell(headerRow2, 11, "", headerStyle);
+        createHeaderCell(headerRow2, 12, "", headerStyle);
+        createHeaderCell(headerRow2, 13, "", headerStyle);
+        createHeaderCell(headerRow2, 14, "平均分", headerStyle);
+        createHeaderCell(headerRow2, 15, "平均分折合分", headerStyle);
+        createHeaderCell(headerRow2, 16, "行政班分", headerStyle);
+        createHeaderCell(headerRow2, 17, "总分", headerStyle);
+
+        // ========== 数据行 ==========
+        for (Map.Entry<String, List<PartTimeClassAdvisorRecord>> entry : teacherGroups.entrySet()) {
+            List<PartTimeClassAdvisorRecord> records = entry.getValue();
+            int groupSize = records.size();
+
+            for (int i = 0; i < groupSize; i++) {
+                PartTimeClassAdvisorRecord r = records.get(i);
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx);
+                row.setHeight((short) (22 * 20));
+
+                // A: 姓名
+                org.apache.poi.ss.usermodel.Cell cellA = row.createCell(0);
+                cellA.setCellValue(r.getTeacherName() != null ? r.getTeacherName() : "");
+                cellA.setCellStyle(dataStyle);
+
+                // B: 负责班级
+                org.apache.poi.ss.usermodel.Cell cellB = row.createCell(1);
+                cellB.setCellValue(r.getClassId() != null ? r.getClassId() : "");
+                cellB.setCellStyle(dataStyle);
+
+                // C-K: 各项得分
+                setCellValue(row, 2, r.getStudyStyleWorkReq(), dataStyle);
+                setCellValue(row, 3, r.getStudyStyleEffect(), dataStyle);
+                setCellValue(row, 4, r.getSafetyEduWorkReq(), dataStyle);
+                setCellValue(row, 5, r.getSafetyEduEffect(), dataStyle);
+                setCellValue(row, 6, r.getStrugglingStudentWorkReq(), dataStyle);
+                setCellValue(row, 7, r.getStrugglingStudentEffect(), dataStyle);
+                setCellValue(row, 8, r.getAchievementSafety(), dataStyle);
+                setCellValue(row, 9, r.getAchievementStudyStyle(), dataStyle);
+                setCellValue(row, 10, r.getAchievementStruggling(), dataStyle);
+
+                // L: 总得分
+                BigDecimal rowTotal = PartTimeClassAdvisorScoringConstants.calcRowTotal(
+                        r.getStudyStyleWorkReq(), r.getStudyStyleEffect(),
+                        r.getSafetyEduWorkReq(), r.getSafetyEduEffect(),
+                        r.getStrugglingStudentWorkReq(), r.getStrugglingStudentEffect(),
+                        r.getAchievementSafety(), r.getAchievementStudyStyle(),
+                        r.getAchievementStruggling());
+                setCellValue(row, 11, rowTotal, dataStyle);
+
+                // M: 换算最终得分（仅第一行显示）
+                if (i == 0) {
+                    BigDecimal converted = PartTimeClassAdvisorScoringConstants.convertScore(rowTotal);
+                    setCellValue(row, 12, converted, dataStyle);
+                } else {
+                    createCell(row, 12, dataStyle);
+                }
+
+                // N: 合计、O: 平均分、P: 平均分折合分（仅最后一行显示）
+                if (i == groupSize - 1) {
+                    BigDecimal sumTotal = BigDecimal.ZERO;
+                    for (PartTimeClassAdvisorRecord gr : records) {
+                        sumTotal = sumTotal.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
+                                gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
+                                gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
+                                gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
+                                gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
+                                gr.getAchievementStruggling()));
+                    }
+                    setCellValue(row, 13, sumTotal, dataStyle);
+
+                    BigDecimal avg = sumTotal.divide(new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
+                    setCellValue(row, 14, avg, dataStyle);
+
+                    BigDecimal avgConverted = PartTimeClassAdvisorScoringConstants.convertScore(avg);
+                    setCellValue(row, 15, avgConverted, dataStyle);
+                } else {
+                    createCell(row, 13, dataStyle);
+                    createCell(row, 14, dataStyle);
+                    createCell(row, 15, dataStyle);
+                }
+
+                // Q: 行政班分
+                setCellValue(row, 16, r.getAdminClassScore(), dataStyle);
+
+                // R: 总分（仅第一行显示）
+                if (i == 0) {
+                    BigDecimal totalAdminClassScore = BigDecimal.ZERO;
+                    BigDecimal sumTotalForAvg = BigDecimal.ZERO;
+                    for (PartTimeClassAdvisorRecord gr : records) {
+                        totalAdminClassScore = totalAdminClassScore.add(
+                                gr.getAdminClassScore() != null ? gr.getAdminClassScore() : BigDecimal.ZERO);
+                        sumTotalForAvg = sumTotalForAvg.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
+                                gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
+                                gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
+                                gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
+                                gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
+                                gr.getAchievementStruggling()));
+                    }
+                    BigDecimal avgForConvert = sumTotalForAvg.divide(
+                            new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
+                    BigDecimal avgConvScore = PartTimeClassAdvisorScoringConstants.convertScore(avgForConvert);
+                    BigDecimal finalScore = avgConvScore.add(totalAdminClassScore);
+                    setCellValue(row, 17, finalScore, dataStyle);
+                } else {
+                    createCell(row, 17, dataStyle);
+                }
+
+                rowIdx++;
+            }
+        }
+
+        // 设置行高
+        for (int i = 0; i < rowIdx; i++) {
+            org.apache.poi.ss.usermodel.Row r = sheet.getRow(i);
+            if (r != null) {
+                r.setHeight((short) (22 * 20));
+            }
+        }
+        titleRow.setHeight((short) (18 * 20));
+    }
+
+    private void createHeaderCell(org.apache.poi.ss.usermodel.Row row, int col, String value,
+                                   org.apache.poi.ss.usermodel.CellStyle style) {
+        org.apache.poi.ss.usermodel.Cell cell = row.createCell(col);
+        cell.setCellValue(value);
+        cell.setCellStyle(style);
+    }
+
+    private void setCellValue(org.apache.poi.ss.usermodel.Row row, int col, BigDecimal value,
+                               org.apache.poi.ss.usermodel.CellStyle style) {
+        org.apache.poi.ss.usermodel.Cell cell = row.createCell(col);
+        if (value != null) {
+            cell.setCellValue(value.doubleValue());
+        }
+        cell.setCellStyle(style);
+    }
+
+    private void createCell(org.apache.poi.ss.usermodel.Row row, int col,
+                             org.apache.poi.ss.usermodel.CellStyle style) {
+        org.apache.poi.ss.usermodel.Cell cell = row.createCell(col);
+        cell.setCellStyle(style);
     }
 }

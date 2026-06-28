@@ -394,4 +394,49 @@ CREATE TABLE IF NOT EXISTS sports_event_score
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '体育比赛业绩得分明细' COLLATE utf8mb4_unicode_ci;
 
+-- ===================== 兼职班主任业绩记录表（v10） =====================
+DROP TABLE IF EXISTS part_time_class_advisor_record;
+CREATE TABLE IF NOT EXISTS part_time_class_advisor_record
+(
+    id                            BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name                     VARCHAR(64)   DEFAULT '兼职班主任'   NOT NULL COMMENT '记录类型名称',
+    user_id                       BIGINT                                NOT NULL COMMENT '填报用户ID',
+    teacher_name                  VARCHAR(128)                          NOT NULL COMMENT '教师姓名',
+    class_id                      VARCHAR(64)                           NOT NULL COMMENT '负责班级编号',
+    study_style_work_req          DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '学风建设-工作要求（满分20）',
+    study_style_effect            DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '学风建设-效果评估（满分10）',
+    safety_edu_work_req           DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '安全教育-工作要求（满分20）',
+    safety_edu_effect             DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '安全教育-效果评估（满分10）',
+    struggling_student_work_req   DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '后进生帮扶-工作要求（满分20）',
+    struggling_student_effect     DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '后进生帮扶-效果评估（满分10）',
+    achievement_safety            DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '育人成果-安全稳定（满分3）',
+    achievement_study_style       DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '育人成果-学风建设（满分3）',
+    achievement_struggling        DECIMAL(5,1)  DEFAULT 0               NULL COMMENT '育人成果-后进生帮扶（满分4）',
+    admin_class_score             DECIMAL(4,2)                          NULL COMMENT '行政班分（1.0或0.5）',
+    is_freshmen_or_graduating     TINYINT       DEFAULT 0               NOT NULL COMMENT '是否新生或毕业班：0-普通班级，1-新生/毕业班',
+    proof_image_data              LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time                   DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time                   DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete                     TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '兼职班主任业绩记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 兼职班主任业绩得分明细表（v10） =====================
+DROP TABLE IF EXISTS part_time_class_advisor_score;
+CREATE TABLE IF NOT EXISTS part_time_class_advisor_score
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id    BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id      BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score        DECIMAL(6,3) NOT NULL COMMENT '得分',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete    TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '兼职班主任业绩得分明细' COLLATE utf8mb4_unicode_ci;
 
