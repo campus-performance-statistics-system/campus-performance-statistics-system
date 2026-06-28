@@ -315,3 +315,43 @@ CREATE TABLE IF NOT EXISTS teaching_reform_score
     INDEX idx_user_id (user_id),
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '教改科研项目业绩得分明细' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 论文业绩记录表（v8） =====================
+DROP TABLE IF EXISTS thesis_record;
+CREATE TABLE IF NOT EXISTS thesis_record
+(
+    id                BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name         VARCHAR(64)   DEFAULT '论文业绩' NOT NULL COMMENT '记录类型名称',
+    user_id           BIGINT                                NOT NULL COMMENT '填报用户ID',
+    thesis_name       VARCHAR(512)                          NOT NULL COMMENT '论文名称',
+    journal_name      VARCHAR(512)                          NULL COMMENT '发表刊物',
+    thesis_level      VARCHAR(32)                           NOT NULL COMMENT '论文等级：level_1-一级, level_2-二级, level_3-三级, level_4-四级',
+    authors_data      TEXT                                  NULL COMMENT '作者及得分分配JSON数组',
+    score_data        TEXT                                  NULL COMMENT '得分明细JSON数组',
+    proof_image_data  LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete         TINYINT      DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_thesis_level (thesis_level),
+    INDEX idx_thesis_name (thesis_name)
+) COMMENT '论文业绩记录' COLLATE utf8mb4_unicode_ci;
+
+-- ===================== 论文业绩得分明细表（v8） =====================
+DROP TABLE IF EXISTS thesis_score;
+CREATE TABLE IF NOT EXISTS thesis_score
+(
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id       BIGINT NOT NULL COMMENT '关联记录ID',
+    user_id         BIGINT NULL COMMENT '教师用户ID（可为空，仅通过姓名匹配）',
+    teacher_name    VARCHAR(128) NOT NULL COMMENT '教师姓名（冗余，方便导出）',
+    score           DECIMAL(6,3) NOT NULL COMMENT '得分',
+    is_first_author TINYINT DEFAULT 0 NOT NULL COMMENT '是否第一作者：1是0否',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time     DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    is_delete       TINYINT  DEFAULT 0 NOT NULL,
+    INDEX idx_record_id (record_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '论文业绩得分明细' COLLATE utf8mb4_unicode_ci;

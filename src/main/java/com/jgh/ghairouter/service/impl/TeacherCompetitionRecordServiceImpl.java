@@ -1044,15 +1044,10 @@ public class TeacherCompetitionRecordServiceImpl
                 row.createCell(0).setCellValue(globalSeq++);
                 row.createCell(1).setCellValue(record.getProjectName() != null ? record.getProjectName() : "");
 
-                // 项目类型：对于未获批/未下文/结题，类型列留空（与Excel一致）
-                String status = record.getProjectStatus();
-                if ("approved".equals(status) || "concluded".equals(status)) {
-                    row.createCell(2).setCellValue(
-                            com.jgh.ghairouter.model.constants.TeachingReformScoringConstants
-                                    .getProjectTypeText(record.getProjectType()));
-                } else {
-                    row.createCell(2).setCellValue("");
-                }
+                // 项目类型（所有状态均显示）
+                row.createCell(2).setCellValue(
+                        com.jgh.ghairouter.model.constants.TeachingReformScoringConstants
+                                .getProjectTypeText(record.getProjectType()));
 
                 // 成员及得分
                 row.createCell(3).setCellValue(formatTeachingReformMemberScores(
