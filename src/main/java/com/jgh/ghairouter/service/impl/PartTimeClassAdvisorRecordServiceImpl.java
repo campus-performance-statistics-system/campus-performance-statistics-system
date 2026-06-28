@@ -627,6 +627,26 @@ public class PartTimeClassAdvisorRecordServiceImpl
                 List<PartTimeClassAdvisorRecord> records = entry.getValue();
                 int groupSize = records.size();
 
+                // 预先计算该组的总分（R）和各统计值
+                BigDecimal sumTotalForAvg = BigDecimal.ZERO;
+                BigDecimal totalAdminClassScore = BigDecimal.ZERO;
+                for (PartTimeClassAdvisorRecord gr : records) {
+                    sumTotalForAvg = sumTotalForAvg.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
+                            gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
+                            gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
+                            gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
+                            gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
+                            gr.getAchievementStruggling()));
+                    totalAdminClassScore = totalAdminClassScore.add(
+                            gr.getAdminClassScore() != null ? gr.getAdminClassScore() : BigDecimal.ZERO);
+                }
+                BigDecimal avgForConvert = sumTotalForAvg.divide(
+                        new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
+                BigDecimal avgConvScore = PartTimeClassAdvisorScoringConstants.convertScore(avgForConvert);
+                BigDecimal finalScore = avgConvScore.add(totalAdminClassScore);
+
+                int groupStartRow = rowIdx; // 该组第一行（0-based）
+
                 for (int i = 0; i < groupSize; i++) {
                     PartTimeClassAdvisorRecord r = records.get(i);
                     Row row = sheet.createRow(rowIdx);
@@ -690,11 +710,10 @@ public class PartTimeClassAdvisorRecordServiceImpl
                     cellL.setCellValue(rowTotal.doubleValue());
                     cellL.setCellStyle(dataStyle);
 
-                    // M: 换算最终得分（仅第一行显示）
+                    // M: 换算最终得分 = 总分R（仅第一行显示，且合并同姓名的M单元格）
                     Cell cellM = row.createCell(12);
                     if (i == 0) {
-                        BigDecimal converted = PartTimeClassAdvisorScoringConstants.convertScore(rowTotal);
-                        cellM.setCellValue(converted.doubleValue());
+                        cellM.setCellValue(finalScore.doubleValue());
                     }
                     cellM.setCellStyle(dataStyle);
 
@@ -704,25 +723,13 @@ public class PartTimeClassAdvisorRecordServiceImpl
                     Cell cellP = row.createCell(15);
 
                     if (i == groupSize - 1) {
-                        // 计算该教师所有行的总得分之和
-                        BigDecimal sumTotal = BigDecimal.ZERO;
-                        for (PartTimeClassAdvisorRecord gr : records) {
-                            sumTotal = sumTotal.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
-                                    gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
-                                    gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
-                                    gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
-                                    gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
-                                    gr.getAchievementStruggling()));
-                        }
-                        cellN.setCellValue(sumTotal.doubleValue());
+                        cellN.setCellValue(sumTotalForAvg.doubleValue());
 
                         // O: 平均分 = N / 班级数
-                        BigDecimal avg = sumTotal.divide(new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
-                        cellO.setCellValue(avg.doubleValue());
+                        cellO.setCellValue(avgForConvert.doubleValue());
 
                         // P: 平均分折合分
-                        BigDecimal avgConverted = PartTimeClassAdvisorScoringConstants.convertScore(avg);
-                        cellP.setCellValue(avgConverted.doubleValue());
+                        cellP.setCellValue(avgConvScore.doubleValue());
                     }
                     cellN.setCellStyle(dataStyle);
                     cellO.setCellStyle(dataStyle);
@@ -736,30 +743,18 @@ public class PartTimeClassAdvisorRecordServiceImpl
                     // R: 总分（仅第一行显示）= 平均分折合分 + 所有行政班分之和
                     Cell cellR = row.createCell(17);
                     if (i == 0) {
-                        BigDecimal totalAdminClassScore = BigDecimal.ZERO;
-                        for (PartTimeClassAdvisorRecord gr : records) {
-                            totalAdminClassScore = totalAdminClassScore.add(
-                                    gr.getAdminClassScore() != null ? gr.getAdminClassScore() : BigDecimal.ZERO);
-                        }
-                        // 平均分折合分
-                        BigDecimal sumTotalForAvg = BigDecimal.ZERO;
-                        for (PartTimeClassAdvisorRecord gr : records) {
-                            sumTotalForAvg = sumTotalForAvg.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
-                                    gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
-                                    gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
-                                    gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
-                                    gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
-                                    gr.getAchievementStruggling()));
-                        }
-                        BigDecimal avgForConvert = sumTotalForAvg.divide(
-                                new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
-                        BigDecimal avgConvScore = PartTimeClassAdvisorScoringConstants.convertScore(avgForConvert);
-                        BigDecimal finalScore = avgConvScore.add(totalAdminClassScore);
                         cellR.setCellValue(finalScore.doubleValue());
                     }
                     cellR.setCellStyle(dataStyle);
 
                     rowIdx++;
+                }
+
+                int groupEndRow = rowIdx - 1; // 该组最后一行（0-based）
+
+                // 如果该教师有多行，合并M列单元格（换算最终得分）
+                if (groupSize > 1) {
+                    sheet.addMergedRegion(new CellRangeAddress(groupStartRow, groupEndRow, 12, 12));
                 }
             }
 

@@ -1808,6 +1808,26 @@ public class TeacherCompetitionRecordServiceImpl
             List<PartTimeClassAdvisorRecord> records = entry.getValue();
             int groupSize = records.size();
 
+            // 预先计算该组的总分（R）和各统计值
+            BigDecimal sumTotalForAvg = BigDecimal.ZERO;
+            BigDecimal totalAdminClassScore = BigDecimal.ZERO;
+            for (PartTimeClassAdvisorRecord gr : records) {
+                sumTotalForAvg = sumTotalForAvg.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
+                        gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
+                        gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
+                        gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
+                        gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
+                        gr.getAchievementStruggling()));
+                totalAdminClassScore = totalAdminClassScore.add(
+                        gr.getAdminClassScore() != null ? gr.getAdminClassScore() : BigDecimal.ZERO);
+            }
+            BigDecimal avgForConvert = sumTotalForAvg.divide(
+                    new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
+            BigDecimal avgConvScore = PartTimeClassAdvisorScoringConstants.convertScore(avgForConvert);
+            BigDecimal finalScore = avgConvScore.add(totalAdminClassScore);
+
+            int groupStartRow = rowIdx; // 该组第一行
+
             for (int i = 0; i < groupSize; i++) {
                 PartTimeClassAdvisorRecord r = records.get(i);
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx);
@@ -1843,32 +1863,18 @@ public class TeacherCompetitionRecordServiceImpl
                         r.getAchievementStruggling());
                 setCellValue(row, 11, rowTotal, dataStyle);
 
-                // M: 换算最终得分（仅第一行显示）
+                // M: 换算最终得分 = 总分R（仅第一行显示，且合并同姓名的M单元格）
                 if (i == 0) {
-                    BigDecimal converted = PartTimeClassAdvisorScoringConstants.convertScore(rowTotal);
-                    setCellValue(row, 12, converted, dataStyle);
+                    setCellValue(row, 12, finalScore, dataStyle);
                 } else {
                     createCell(row, 12, dataStyle);
                 }
 
                 // N: 合计、O: 平均分、P: 平均分折合分（仅最后一行显示）
                 if (i == groupSize - 1) {
-                    BigDecimal sumTotal = BigDecimal.ZERO;
-                    for (PartTimeClassAdvisorRecord gr : records) {
-                        sumTotal = sumTotal.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
-                                gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
-                                gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
-                                gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
-                                gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
-                                gr.getAchievementStruggling()));
-                    }
-                    setCellValue(row, 13, sumTotal, dataStyle);
-
-                    BigDecimal avg = sumTotal.divide(new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
-                    setCellValue(row, 14, avg, dataStyle);
-
-                    BigDecimal avgConverted = PartTimeClassAdvisorScoringConstants.convertScore(avg);
-                    setCellValue(row, 15, avgConverted, dataStyle);
+                    setCellValue(row, 13, sumTotalForAvg, dataStyle);
+                    setCellValue(row, 14, avgForConvert, dataStyle);
+                    setCellValue(row, 15, avgConvScore, dataStyle);
                 } else {
                     createCell(row, 13, dataStyle);
                     createCell(row, 14, dataStyle);
@@ -1880,28 +1886,19 @@ public class TeacherCompetitionRecordServiceImpl
 
                 // R: 总分（仅第一行显示）
                 if (i == 0) {
-                    BigDecimal totalAdminClassScore = BigDecimal.ZERO;
-                    BigDecimal sumTotalForAvg = BigDecimal.ZERO;
-                    for (PartTimeClassAdvisorRecord gr : records) {
-                        totalAdminClassScore = totalAdminClassScore.add(
-                                gr.getAdminClassScore() != null ? gr.getAdminClassScore() : BigDecimal.ZERO);
-                        sumTotalForAvg = sumTotalForAvg.add(PartTimeClassAdvisorScoringConstants.calcRowTotal(
-                                gr.getStudyStyleWorkReq(), gr.getStudyStyleEffect(),
-                                gr.getSafetyEduWorkReq(), gr.getSafetyEduEffect(),
-                                gr.getStrugglingStudentWorkReq(), gr.getStrugglingStudentEffect(),
-                                gr.getAchievementSafety(), gr.getAchievementStudyStyle(),
-                                gr.getAchievementStruggling()));
-                    }
-                    BigDecimal avgForConvert = sumTotalForAvg.divide(
-                            new BigDecimal(groupSize), 2, RoundingMode.HALF_UP);
-                    BigDecimal avgConvScore = PartTimeClassAdvisorScoringConstants.convertScore(avgForConvert);
-                    BigDecimal finalScore = avgConvScore.add(totalAdminClassScore);
                     setCellValue(row, 17, finalScore, dataStyle);
                 } else {
                     createCell(row, 17, dataStyle);
                 }
 
                 rowIdx++;
+            }
+
+            int groupEndRow = rowIdx - 1; // 该组最后一行
+
+            // 如果该教师有多行，合并M列单元格（换算最终得分）
+            if (groupSize > 1) {
+                sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(groupStartRow, groupEndRow, 12, 12));
             }
         }
 
