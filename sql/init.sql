@@ -440,3 +440,22 @@ CREATE TABLE IF NOT EXISTS part_time_class_advisor_score
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '兼职班主任业绩得分明细' COLLATE utf8mb4_unicode_ci;
 
+-- ===================== 监考次数统计记录表（v11） =====================
+DROP TABLE IF EXISTS invigilation_record;
+CREATE TABLE IF NOT EXISTS invigilation_record
+(
+    id                  BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name           VARCHAR(64)   DEFAULT '监考次数统计' NOT NULL COMMENT '记录类型名称',
+    user_id             BIGINT                                NOT NULL COMMENT '填报用户ID',
+    teacher_name        VARCHAR(128)                          NOT NULL COMMENT '监考老师姓名',
+    invigilation_count  INT           DEFAULT 0               NOT NULL COMMENT '监考次数',
+    proof_image_data    LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete           TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_teacher_name (teacher_name)
+) COMMENT '监考次数统计记录' COLLATE utf8mb4_unicode_ci;
+
+
