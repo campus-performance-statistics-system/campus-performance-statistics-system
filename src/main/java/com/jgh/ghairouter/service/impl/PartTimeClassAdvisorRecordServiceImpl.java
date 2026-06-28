@@ -530,7 +530,7 @@ public class PartTimeClassAdvisorRecordServiceImpl
             hM3.setCellStyle(headerStyle);
 
             // 合并一级表头
-            sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 0));   // A3 姓名
+            sheet.addMergedRegion(new CellRangeAddress(2, 3, 0, 0));   // A3:A4 姓名
             sheet.addMergedRegion(new CellRangeAddress(2, 3, 1, 1));   // B3:B4 负责班级
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 2, 3));   // C3:D3 学风建设
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 4, 5));   // E3:F3 安全教育
@@ -538,7 +538,6 @@ public class PartTimeClassAdvisorRecordServiceImpl
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 8, 10));  // I3:K3 育人成果
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 11, 11)); // L3 总得分
             sheet.addMergedRegion(new CellRangeAddress(2, 2, 12, 12)); // M3 换算最终得分
-            sheet.addMergedRegion(new CellRangeAddress(2, 3, 0, 0));   // A3:A4 姓名
 
             // N3-R3 headers
             Cell hN3 = headerRow1.createCell(13);

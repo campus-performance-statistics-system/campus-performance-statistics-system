@@ -763,9 +763,13 @@ public class StatisticsServiceImpl implements StatisticsService {
             }
         }
 
-        // 复制合并单元格
+        // 复制合并单元格（跳过重复/冲突的区域）
         for (int i = 0; i < source.getNumMergedRegions(); i++) {
-            target.addMergedRegion(source.getMergedRegion(i));
+            try {
+                target.addMergedRegion(source.getMergedRegion(i));
+            } catch (Exception ignored) {
+                // 合并区域冲突时跳过（如源Sheet中存在重叠区域）
+            }
         }
     }
 }
