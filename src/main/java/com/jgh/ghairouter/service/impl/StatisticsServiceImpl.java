@@ -646,9 +646,8 @@ public class StatisticsServiceImpl implements StatisticsService {
                                 ? record.getTeacherName() : "未知教师");
                 String companyName = sanitizeFilename(
                         StrUtil.isNotBlank(record.getCompanyName())
-                                ? "-" + record.getCompanyName() : "");
-                String userName = sanitizeFilename(getUserName(record.getUserId()));
-                String fileName = seq + "-" + teacherName + companyName + "-" + userName + ".png";
+                                ? record.getCompanyName() : "未知单位");
+                String fileName = seq + "-" + companyName + "-" + teacherName + ".png";
                 String zipPath = "所有附件/推荐学院学生签约就业/" + fileName;
 
                 byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
