@@ -53,4 +53,23 @@ public class StatisticsController {
         }
     }
 
+    @GetMapping("/export-all-excel")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "导出所有分类为一个多Sheet的Excel文件")
+    public void exportAllToExcel(HttpServletResponse response) {
+        byte[] excelData = statisticsService.exportAllToExcel();
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        String encodedFilename = java.net.URLEncoder.encode("业绩汇总.xlsx", java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        response.setHeader("Content-Disposition",
+                "attachment; filename*=UTF-8''" + encodedFilename);
+        response.setContentLength(excelData.length);
+        try {
+            response.getOutputStream().write(excelData);
+            response.getOutputStream().flush();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "导出失败: " + e.getMessage());
+        }
+    }
+
 }

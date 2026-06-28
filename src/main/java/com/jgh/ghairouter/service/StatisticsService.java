@@ -25,4 +25,10 @@ public interface StatisticsService {
      * 文件名格式：序号-比赛名称-用户姓名.png
      */
     byte[] exportAllAttachmentsToZip();
+
+    /**
+     * 导出所有比赛分类为一个多Sheet的Excel文件。
+     * 每个分类对应一个Sheet。
+     */
+    byte[] exportAllToExcel();
 }

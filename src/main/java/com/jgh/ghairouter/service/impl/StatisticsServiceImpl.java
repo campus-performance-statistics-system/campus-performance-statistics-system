@@ -26,13 +26,19 @@ import com.jgh.ghairouter.model.entity.ThesisRecord;
 import com.jgh.ghairouter.model.entity.TrainingGuidanceRecord;
 import com.jgh.ghairouter.model.entity.User;
 import com.jgh.ghairouter.model.vo.UserScoreStatisticsVO;
-import com.jgh.ghairouter.service.StatisticsService;
+import com.jgh.ghairouter.service.*;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -85,6 +91,28 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private UserMapper userMapper;
+
+    // ==================== 各分类服务（用于统一Excel导出） ====================
+    @Resource
+    private TeacherCompetitionRecordService teacherRecordService;
+    @Resource
+    private StudentCompetitionRecordService studentRecordService;
+    @Resource
+    private TrainingGuidanceRecordService trainingRecordService;
+    @Resource
+    private ResearchAchievementRecordService researchRecordService;
+    @Resource
+    private InnovationEntrepreneurshipRecordService innovationRecordService;
+    @Resource
+    private TeachingReformRecordService teachingReformRecordService;
+    @Resource
+    private ThesisRecordService thesisRecordService;
+    @Resource
+    private SportsEventRecordService sportsRecordService;
+    @Resource
+    private PartTimeClassAdvisorRecordService advisorRecordService;
+    @Resource
+    private InvigilationRecordService invigilationRecordService;
 
     /**
      * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
@@ -634,5 +662,107 @@ public class StatisticsServiceImpl implements StatisticsService {
         if (val instanceof BigDecimal bd) return bd;
         if (val instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
         return new BigDecimal(val.toString());
+    }
+
+    // ==================== 多Sheet Excel导出 ====================
+
+    @Override
+    public byte[] exportAllToExcel() {
+        try (XSSFWorkbook combinedWorkbook = new XSSFWorkbook()) {
+
+            // 按顺序导出各分类Sheet
+            copySheetFromService(combinedWorkbook, () -> teacherRecordService.exportRecordsToExcel(), "1-教师获奖");
+            copySheetFromService(combinedWorkbook, () -> studentRecordService.exportRecordsToExcel(), "2-指导学生科技竞赛");
+            copySheetFromService(combinedWorkbook, () -> trainingRecordService.exportRecordsToExcel(), "3-指导实训");
+            copySheetFromService(combinedWorkbook, () -> researchRecordService.exportRecordsToExcel(), "4-科研及教材业绩");
+            copySheetFromService(combinedWorkbook, () -> innovationRecordService.exportRecordsToExcel(), "5-大创业绩");
+            copySheetFromService(combinedWorkbook, () -> teachingReformRecordService.exportRecordsToExcel(), "6-教改科研项目业绩");
+            copySheetFromService(combinedWorkbook, () -> thesisRecordService.exportRecordsToExcel(), "7-论文业绩");
+            copySheetFromService(combinedWorkbook, () -> sportsRecordService.exportRecordsToExcel(), "8-体育比赛业绩");
+            copySheetFromService(combinedWorkbook, () -> advisorRecordService.exportRecordsToExcel(), "9-兼职班主任");
+            copySheetFromService(combinedWorkbook, () -> invigilationRecordService.exportRecordsToExcel(), "10-监考次数统计");
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            combinedWorkbook.write(bos);
+            return bos.toByteArray();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 从各分类服务导出Excel并复制Sheet到合并工作簿
+     */
+    private void copySheetFromService(XSSFWorkbook combined, java.util.function.Supplier<byte[]> exportFunc, String sheetName) {
+        try {
+            byte[] data = exportFunc.get();
+            if (data == null || data.length == 0) return;
+            try (Workbook sourceWorkbook = WorkbookFactory.create(new ByteArrayInputStream(data))) {
+                Sheet sourceSheet = sourceWorkbook.getSheetAt(0);
+                if (sourceSheet == null) return;
+                Sheet newSheet = combined.createSheet(sheetName);
+                copySheet(sourceSheet, newSheet);
+            }
+        } catch (Exception e) {
+            log.warn("复制Sheet失败: sheetName={}, error={}", sheetName, e.getMessage());
+        }
+    }
+
+    /**
+     * 复制Sheet内容（行列数据、列宽、合并单元格）。
+     * 注意：不复制跨Workbook的样式（会抛异常），仅复制数据和结构。
+     */
+    private void copySheet(Sheet source, Sheet target) {
+        int lastRowNum = source.getLastRowNum();
+        if (lastRowNum < 0) return;
+
+        // 复制列宽
+        int maxCol = 0;
+        for (int i = 0; i <= lastRowNum; i++) {
+            org.apache.poi.ss.usermodel.Row row = source.getRow(i);
+            if (row != null && row.getLastCellNum() > maxCol) {
+                maxCol = row.getLastCellNum();
+            }
+        }
+        for (int i = 0; i < maxCol; i++) {
+            int w = source.getColumnWidth(i);
+            if (w > 0) target.setColumnWidth(i, w);
+        }
+
+        // 复制行和单元格（仅复制值，不复制跨Workbook样式）
+        for (int i = 0; i <= lastRowNum; i++) {
+            org.apache.poi.ss.usermodel.Row sourceRow = source.getRow(i);
+            if (sourceRow == null) continue;
+            org.apache.poi.ss.usermodel.Row targetRow = target.createRow(i);
+            targetRow.setHeight(sourceRow.getHeight());
+
+            for (int j = 0; j < sourceRow.getLastCellNum(); j++) {
+                org.apache.poi.ss.usermodel.Cell sourceCell = sourceRow.getCell(j);
+                if (sourceCell == null) continue;
+                org.apache.poi.ss.usermodel.Cell targetCell = targetRow.createCell(j);
+
+                switch (sourceCell.getCellType()) {
+                    case STRING:
+                        targetCell.setCellValue(sourceCell.getStringCellValue());
+                        break;
+                    case NUMERIC:
+                        targetCell.setCellValue(sourceCell.getNumericCellValue());
+                        break;
+                    case BOOLEAN:
+                        targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                        break;
+                    case FORMULA:
+                        targetCell.setCellFormula(sourceCell.getCellFormula());
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        // 复制合并单元格
+        for (int i = 0; i < source.getNumMergedRegions(); i++) {
+            target.addMergedRegion(source.getMergedRegion(i));
+        }
     }
 }
