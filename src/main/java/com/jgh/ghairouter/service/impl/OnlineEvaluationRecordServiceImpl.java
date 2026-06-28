@@ -441,16 +441,18 @@ public class OnlineEvaluationRecordServiceImpl
                             Cell totalAvgCell = dataRow.createCell(6);
                             if (firstRow && teacherRecords.size() > 1) {
                                 // 使用Excel公式计算加权平均
+                                // rowIdx 在 createRow(rowIdx++) 后已指向下一行，
+                                // 当前教师的第 j 条记录在第 (rowIdx + j) 个 Excel 行号
                                 StringBuilder formula = new StringBuilder("(");
                                 for (int j = 0; j < teacherRecords.size(); j++) {
                                     if (j > 0) formula.append("+");
-                                    int rowNum = rowIdx - teacherRecords.size() + j + 1;
+                                    int rowNum = rowIdx + j;
                                     formula.append("F").append(rowNum).append("*E").append(rowNum);
                                 }
                                 formula.append(")/(");
                                 for (int j = 0; j < teacherRecords.size(); j++) {
                                     if (j > 0) formula.append("+");
-                                    int rowNum = rowIdx - teacherRecords.size() + j + 1;
+                                    int rowNum = rowIdx + j;
                                     formula.append("E").append(rowNum);
                                 }
                                 formula.append(")");
