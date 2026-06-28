@@ -458,4 +458,30 @@ CREATE TABLE IF NOT EXISTS invigilation_record
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '监考次数统计记录' COLLATE utf8mb4_unicode_ci;
 
+-- ===================== 网上评教记录表（v12） =====================
+DROP TABLE IF EXISTS online_evaluation_record;
+CREATE TABLE IF NOT EXISTS online_evaluation_record
+(
+    id                  BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name           VARCHAR(64)   DEFAULT '网上评教'       NOT NULL COMMENT '记录类型名称',
+    user_id             BIGINT                                NOT NULL COMMENT '填报用户ID',
+    teacher_name        VARCHAR(128)                          NOT NULL COMMENT '教师姓名',
+    teacher_type        VARCHAR(32)   DEFAULT '专任教师'      NOT NULL COMMENT '教师类型：专任教师/外聘教师',
+    academic_year       VARCHAR(32)                           NOT NULL COMMENT '学年（如2022-2023）',
+    semester            VARCHAR(32)                           NOT NULL COMMENT '学期（如第一学期/第二学期）',
+    course_code         VARCHAR(128)                          NOT NULL COMMENT '课程序号',
+    course_name         VARCHAR(256)                          NOT NULL COMMENT '课程名称',
+    participant_count   INT           DEFAULT 0               NOT NULL COMMENT '参评人数',
+    average_score       DECIMAL(5,2)  DEFAULT 0.00            NOT NULL COMMENT '平均分',
+    proof_image_data    LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time         DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete           TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_teacher_name (teacher_name),
+    INDEX idx_teacher_type (teacher_type),
+    INDEX idx_academic_year (academic_year)
+) COMMENT '网上评教记录' COLLATE utf8mb4_unicode_ci;
+
 

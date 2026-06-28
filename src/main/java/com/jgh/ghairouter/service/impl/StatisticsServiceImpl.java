@@ -113,6 +113,8 @@ public class StatisticsServiceImpl implements StatisticsService {
     private PartTimeClassAdvisorRecordService advisorRecordService;
     @Resource
     private InvigilationRecordService invigilationRecordService;
+    @Resource
+    private OnlineEvaluationRecordService onlineEvaluationRecordService;
 
     /**
      * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
@@ -681,6 +683,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             copySheetFromService(combinedWorkbook, () -> sportsRecordService.exportRecordsToExcel(), "8-体育比赛业绩");
             copySheetFromService(combinedWorkbook, () -> advisorRecordService.exportRecordsToExcel(), "9-兼职班主任");
             copySheetFromService(combinedWorkbook, () -> invigilationRecordService.exportRecordsToExcel(), "10-监考次数统计");
+            copySheetFromService(combinedWorkbook, () -> onlineEvaluationRecordService.exportRecordsToExcel(), "11-网上评教");
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             combinedWorkbook.write(bos);
