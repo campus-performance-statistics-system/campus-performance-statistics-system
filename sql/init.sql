@@ -504,4 +504,26 @@ CREATE TABLE IF NOT EXISTS recommended_employment_record
     INDEX idx_teacher_name (teacher_name)
 ) COMMENT '推荐学院学生签约就业记录' COLLATE utf8mb4_unicode_ci;
 
+-- ----------------------------
+-- v14：签订合作企业
+-- ----------------------------
+DROP TABLE IF EXISTS cooperative_enterprise_record;
+CREATE TABLE IF NOT EXISTS cooperative_enterprise_record
+(
+    id               BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name        VARCHAR(64)   DEFAULT '签订合作企业'           NOT NULL COMMENT '记录类型名称',
+    user_id          BIGINT                                NOT NULL COMMENT '填报用户ID',
+    college          VARCHAR(256)                          NOT NULL COMMENT '学院',
+    enterprise_name  VARCHAR(512)                          NOT NULL COMMENT '企业名称',
+    teacher_name     VARCHAR(128)                          NOT NULL COMMENT '签订合作企业老师',
+    proof_image_data LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time      DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time      DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete        TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_teacher_name (teacher_name),
+    INDEX idx_college (college),
+    INDEX idx_enterprise_name (enterprise_name)
+) COMMENT '签订合作企业记录' COLLATE utf8mb4_unicode_ci;
 
