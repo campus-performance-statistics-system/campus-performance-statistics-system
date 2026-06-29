@@ -10,6 +10,8 @@ import com.jgh.ghairouter.mapper.PartTimeClassAdvisorRecordMapper;
 import com.jgh.ghairouter.mapper.PartTimeClassAdvisorScoreMapper;
 import com.jgh.ghairouter.mapper.CooperativeEnterpriseRecordMapper;
 import com.jgh.ghairouter.mapper.RecommendedEmploymentRecordMapper;
+import com.jgh.ghairouter.mapper.ExcellentGraduationProjectRecordMapper;
+import com.jgh.ghairouter.mapper.SchoolEnterpriseTrainingRecordMapper;
 import com.jgh.ghairouter.mapper.YoungTeacherGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.ResearchAchievementRecordMapper;
 import com.jgh.ghairouter.mapper.StudentCompetitionRecordMapper;
@@ -21,6 +23,8 @@ import com.jgh.ghairouter.mapper.ThesisRecordMapper;
 import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.CooperativeEnterpriseRecord;
+import com.jgh.ghairouter.model.entity.ExcellentGraduationProjectRecord;
+import com.jgh.ghairouter.model.entity.SchoolEnterpriseTrainingRecord;
 import com.jgh.ghairouter.model.entity.YoungTeacherGuidanceRecord;
 import com.jgh.ghairouter.model.entity.InnovationEntrepreneurshipRecord;
 import com.jgh.ghairouter.model.entity.InvigilationRecord;
@@ -109,6 +113,12 @@ public class StatisticsServiceImpl implements StatisticsService {
     private YoungTeacherGuidanceRecordMapper youngTeacherGuidanceRecordMapper;
 
     @Resource
+    private ExcellentGraduationProjectRecordMapper excellentGraduationProjectRecordMapper;
+
+    @Resource
+    private SchoolEnterpriseTrainingRecordMapper schoolEnterpriseTrainingRecordMapper;
+
+    @Resource
     private InvigilationRecordMapper invigilationRecordMapper;
 
     @Resource
@@ -149,6 +159,12 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private YoungTeacherGuidanceRecordService youngTeacherGuidanceRecordService;
+
+    @Resource
+    private ExcellentGraduationProjectRecordService excellentGraduationProjectRecordService;
+
+    @Resource
+    private SchoolEnterpriseTrainingRecordService schoolEnterpriseTrainingRecordService;
 
     /**
      * 教师获奖总分（user_competition_score 表，负责人 +2 基础分）
@@ -827,6 +843,64 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
+            // ---- 15-优秀毕设 ----
+            String dir15 = "所有附件/15-优秀毕设/";
+            ensureZipDir(zos, dir15);
+            List<ExcellentGraduationProjectRecord> excellentGraduationProjectRecords = excellentGraduationProjectRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (ExcellentGraduationProjectRecord record : excellentGraduationProjectRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String studentName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getStudentName())
+                                ? record.getStudentName() : "未知学生");
+                String projectTitle = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getProjectTitle())
+                                ? "-" + record.getProjectTitle() : "");
+                String fileName = seq + "-" + studentName + projectTitle + ".png";
+                String zipPath = dir15 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
+            // ---- 16-校企联合培养 ----
+            String dir16 = "所有附件/16-校企联合培养/";
+            ensureZipDir(zos, dir16);
+            List<SchoolEnterpriseTrainingRecord> schoolEnterpriseTrainingRecords = schoolEnterpriseTrainingRecordMapper.selectListByQuery(
+                    QueryWrapper.create().orderBy("create_time", true));
+            seq = 1;
+            for (SchoolEnterpriseTrainingRecord record : schoolEnterpriseTrainingRecords) {
+                if (StrUtil.isBlank(record.getProofImageData())) {
+                    continue;
+                }
+                String studentName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getStudentName())
+                                ? record.getStudentName() : "未知学生");
+                String companyName = sanitizeFilename(
+                        StrUtil.isNotBlank(record.getCompanyName())
+                                ? "-" + record.getCompanyName() : "");
+                String fileName = seq + "-" + studentName + companyName + ".png";
+                String zipPath = dir16 + fileName;
+
+                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
+                if (imageBytes == null) continue;
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
+                zos.putNextEntry(entry);
+                zos.write(imageBytes);
+                zos.closeEntry();
+                seq++;
+            }
+
             zos.finish();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "附件压缩包生成失败: " + e.getMessage());
@@ -899,6 +973,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             copySheetFromService(combinedWorkbook, () -> recommendedEmploymentRecordService.exportRecordsToExcel(), "12-推荐学院学生签约就业");
             copySheetFromService(combinedWorkbook, () -> cooperativeEnterpriseRecordService.exportRecordsToExcel(), "13-签订合作企业");
             copySheetFromService(combinedWorkbook, () -> youngTeacherGuidanceRecordService.exportRecordsToExcel(), "14-指导青年教师");
+            copySheetFromService(combinedWorkbook, () -> excellentGraduationProjectRecordService.exportRecordsToExcel(), "15-优秀毕设");
+            copySheetFromService(combinedWorkbook, () -> schoolEnterpriseTrainingRecordService.exportRecordsToExcel(), "16-校企联合培养");
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             combinedWorkbook.write(bos);
@@ -916,12 +992,15 @@ public class StatisticsServiceImpl implements StatisticsService {
             byte[] data = exportFunc.get();
             if (data == null || data.length == 0) {
                 log.warn("导出数据为空: sheetName={}", sheetName);
+                // 数据为空时仍然创建空Sheet页，保证导出结构完整
+                combined.createSheet(sheetName);
                 return;
             }
             try (Workbook sourceWorkbook = WorkbookFactory.create(new ByteArrayInputStream(data))) {
                 Sheet sourceSheet = sourceWorkbook.getSheetAt(0);
                 if (sourceSheet == null) {
                     log.warn("源Sheet为空: sheetName={}", sheetName);
+                    combined.createSheet(sheetName);
                     return;
                 }
                 Sheet newSheet = combined.createSheet(sheetName);
@@ -929,7 +1008,13 @@ public class StatisticsServiceImpl implements StatisticsService {
                 log.info("Sheet复制成功: sheetName={}, rows={}", sheetName, sourceSheet.getLastRowNum() + 1);
             }
         } catch (Exception e) {
-            log.error("复制Sheet失败: sheetName={}, error={}", sheetName, e.getMessage(), e);
+            log.error("复制Sheet失败，创建空Sheet占位: sheetName={}, error={}", sheetName, e.getMessage());
+            // 即使导出失败也创建空Sheet页，保证导出结构完整
+            try {
+                combined.createSheet(sheetName);
+            } catch (Exception ignored) {
+                log.error("创建空Sheet也失败: sheetName={}", sheetName);
+            }
         }
     }
 

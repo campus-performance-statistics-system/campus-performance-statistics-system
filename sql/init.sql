@@ -552,3 +552,58 @@ CREATE TABLE IF NOT EXISTS young_teacher_guidance_record
     INDEX idx_young_teacher_name (young_teacher_name)
 ) COMMENT '指导青年教师记录' COLLATE utf8mb4_unicode_ci;
 
+-- ----------------------------
+-- v16：2023年优秀毕设
+-- ----------------------------
+DROP TABLE IF EXISTS excellent_graduation_project_record;
+CREATE TABLE IF NOT EXISTS excellent_graduation_project_record
+(
+    id               BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name        VARCHAR(64)    DEFAULT '优秀毕设'          NOT NULL COMMENT '记录类型名称',
+    user_id          BIGINT                                NOT NULL COMMENT '填报用户ID',
+    major            VARCHAR(128)                           NULL COMMENT '专业',
+    student_id       VARCHAR(64)                            NULL COMMENT '学号',
+    student_name     VARCHAR(64)                            NULL COMMENT '学生姓名',
+    project_title    VARCHAR(512)                           NULL COMMENT '毕设题目',
+    advisor_name     VARCHAR(128)                           NULL COMMENT '指导教师',
+    `rank`           INT                                    NULL COMMENT '名次',
+    proof_image_data LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time      DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time      DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete        TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_major (major),
+    INDEX idx_student_name (student_name),
+    INDEX idx_advisor_name (advisor_name)
+) COMMENT '优秀毕设记录表（v16）' COLLATE utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- v17：校企联合培养
+-- ----------------------------
+DROP TABLE IF EXISTS school_enterprise_training_record;
+CREATE TABLE IF NOT EXISTS school_enterprise_training_record
+(
+    id                        BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    type_name                 VARCHAR(64)    DEFAULT '校企联合培养'     NOT NULL COMMENT '记录类型名称',
+    user_id                   BIGINT                                NOT NULL COMMENT '填报用户ID',
+    student_name              VARCHAR(64)                            NULL COMMENT '学生姓名',
+    student_id                VARCHAR(64)                            NULL COMMENT '学号',
+    major                     VARCHAR(128)                           NULL COMMENT '专业',
+    company_name              VARCHAR(256)                           NULL COMMENT '公司名称',
+    remark                    VARCHAR(128)                           NULL COMMENT '备注（3+0.5+0.5或3+1等）',
+    project_collection_status VARCHAR(128)                           NULL COMMENT '企业毕设收集情况',
+    advisor_name              VARCHAR(128)                           NULL COMMENT '校内指导老师',
+    counselor_name            VARCHAR(128)                           NULL COMMENT '校内辅导员',
+    proof_image_data          LONGTEXT                              NULL COMMENT '证明图片（base64数据）',
+    create_time               DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    update_time               DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete                 TINYINT       DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    INDEX idx_user_id (user_id),
+    INDEX idx_type_name (type_name),
+    INDEX idx_student_name (student_name),
+    INDEX idx_major (major),
+    INDEX idx_company_name (company_name),
+    INDEX idx_advisor_name (advisor_name)
+) COMMENT '校企联合培养记录表（v17）' COLLATE utf8mb4_unicode_ci;
+
