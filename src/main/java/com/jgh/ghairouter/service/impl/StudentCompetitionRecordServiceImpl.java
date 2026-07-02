@@ -322,6 +322,8 @@ public class StudentCompetitionRecordServiceImpl
                     }
                     return vo;
                 })
+                .filter(vo -> StrUtil.isBlank(req.getAdminReviewStatus())
+                        || req.getAdminReviewStatus().equals(vo.getAdminReviewStatus()))
                 .collect(Collectors.toList());
         Page<StudentCompetitionRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
         voPage.setRecords(voList);

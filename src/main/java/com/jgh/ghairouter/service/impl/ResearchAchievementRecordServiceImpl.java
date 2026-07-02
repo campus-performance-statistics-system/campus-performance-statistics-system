@@ -308,6 +308,8 @@ public class ResearchAchievementRecordServiceImpl
                     }
                     return vo;
                 })
+                .filter(vo -> StrUtil.isBlank(req.getAdminReviewStatus())
+                        || req.getAdminReviewStatus().equals(vo.getAdminReviewStatus()))
                 .collect(Collectors.toList());
         Page<ResearchAchievementRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
         voPage.setRecords(voList);
