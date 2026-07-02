@@ -273,12 +273,30 @@ public class TrainingGuidanceRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 先查出当前用户在得分表中关联的 recordId 列表
+        List<Long> myScoredRecordIds = trainingScoreMapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .select("record_id")
+                                .eq("user_id", userId)
+                                .eq("is_delete", 0))
+                .stream()
+                .map(TrainingGuidanceScore::getRecordId)
+                .distinct()
+                .collect(Collectors.toList());
+
         // 提交人 OR 在得分表中被分配了得分的教师，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
-                .like("training_name", req.getTrainingName())
-                .where("(user_id = ? OR id IN (SELECT record_id FROM training_guidance_score WHERE user_id = ? AND is_delete = 0))",
-                       userId, userId);
+                .like("training_name", req.getTrainingName());
+        if (CollUtil.isNotEmpty(myScoredRecordIds)) {
+        if (CollUtil.isNotEmpty(myScoredRecordIds)) {
+            String ids = myScoredRecordIds.stream()
+                    .map(String::valueOf).collect(Collectors.joining(","));
+            wrapper.where("(user_id = " + userId + " OR id IN (" + ids + "))");
+        } else {
+            wrapper.eq("user_id", userId);
+        }
+        }
         wrapper.orderBy("create_time", false);
 
         Page<TrainingGuidanceRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

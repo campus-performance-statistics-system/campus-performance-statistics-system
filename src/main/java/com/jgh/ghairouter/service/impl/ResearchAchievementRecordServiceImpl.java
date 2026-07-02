@@ -284,13 +284,29 @@ public class ResearchAchievementRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 先查出当前用户在得分表中关联的 recordId 列表
+        List<Long> myScoredRecordIds = researchScoreMapper.selectListByQuery(
+                        QueryWrapper.create()
+                                .select("record_id")
+                                .eq("user_id", userId)
+                                .eq("is_delete", 0))
+                .stream()
+                .map(ResearchAchievementScore::getRecordId)
+                .distinct()
+                .collect(Collectors.toList());
+
         // 提交人 OR 在得分表中被分配了得分的成员，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .eq("sub_type", req.getSubType())
-                .like("achievement_name", req.getAchievementName())
-                .where("(user_id = ? OR id IN (SELECT record_id FROM research_achievement_score WHERE user_id = ? AND is_delete = 0))",
-                       userId, userId);
+                .like("achievement_name", req.getAchievementName());
+        if (CollUtil.isNotEmpty(myScoredRecordIds)) {
+            String ids = myScoredRecordIds.stream()
+                    .map(String::valueOf).collect(Collectors.joining(","));
+            wrapper.where("(user_id = " + userId + " OR id IN (" + ids + "))");
+        } else {
+            wrapper.eq("user_id", userId);
+        }
         wrapper.orderBy("create_time", false);
 
         Page<ResearchAchievementRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
