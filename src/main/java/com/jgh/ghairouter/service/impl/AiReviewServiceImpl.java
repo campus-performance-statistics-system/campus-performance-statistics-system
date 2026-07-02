@@ -129,14 +129,14 @@ public class AiReviewServiceImpl implements AiReviewService {
     }
 
     private void updateReviewResult(Long recordId, String recordType, String status, String comment) {
-        TeacherCompetitionAuditRecord audit = auditMapper.selectOneByQuery(
+        // 使用条件更新，只更新 auto_review_status 和 auto_review_comment，
+        // 绝不触碰 admin_review_status，防止异步并发覆盖管理员的审核结果
+        TeacherCompetitionAuditRecord updateEntity = new TeacherCompetitionAuditRecord();
+        updateEntity.setAutoReviewStatus(status);
+        updateEntity.setAutoReviewComment(comment);
+        auditMapper.updateByQuery(updateEntity,
                 QueryWrapper.create().eq("record_id", recordId).eq("record_type", recordType));
-        if (audit != null) {
-            audit.setAutoReviewStatus(status);
-            audit.setAutoReviewComment(comment);
-            auditMapper.update(audit);
-            log.info("自动审核完成: recordId={}, status={}", recordId, status);
-        }
+        log.info("自动审核完成: recordId={}, status={}", recordId, status);
     }
 
     /**
