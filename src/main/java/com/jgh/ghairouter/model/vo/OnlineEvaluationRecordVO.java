@@ -36,6 +36,9 @@ public class OnlineEvaluationRecordVO implements Serializable {
     private Integer participantCount;
     private BigDecimal averageScore;
 
+    /** 我的得分（等同于averageScore，用于前端统一展示） */
+    private BigDecimal myScoreDisplay;
+
     /** 证明图片（base64数据） */
     private String proofImageData;
 

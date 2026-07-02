@@ -12,7 +12,7 @@ public interface StatisticsService {
     /**
      * 获取用户的总得分统计
      *
-     * @param type     统计类型：all（所有）、teacher（教师获奖）、student（指导学生科技竞赛）、training（指导实训）、research（科研及教材业绩）、innovation（大创业绩）、teachingReform（教改科研项目业绩）、thesis（论文业绩）、sports（体育比赛业绩）、advisor（兼职班主任）
+     * @param type     统计类型：all（所有业绩）、teacher（教师获奖）、student（指导学生科技竞赛）、training（指导实训）、research（科研及教材业绩）、innovation（大创业绩）、teachingReform（教改科研项目业绩）、thesis（论文业绩）、sports（体育比赛业绩）
      * @param sortOrder 排序方式：ascend（升序）、descend（降序，默认）
      * @param userName 用户名（可选，为空时返回所有用户）
      * @return 用户得分统计列表

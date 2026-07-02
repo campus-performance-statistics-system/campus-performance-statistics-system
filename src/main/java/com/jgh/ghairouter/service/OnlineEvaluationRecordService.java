@@ -48,6 +48,11 @@ public interface OnlineEvaluationRecordService extends IService<OnlineEvaluation
     void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId);
 
     /**
+     * 获取我的网上评教总得分（加权平均分）
+     */
+    java.math.BigDecimal getMyTotalScore(Long userId);
+
+    /**
      * 导出网上评教Excel
      */
     byte[] exportRecordsToExcel();

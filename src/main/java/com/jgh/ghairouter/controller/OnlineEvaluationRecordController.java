@@ -137,4 +137,11 @@ public class OnlineEvaluationRecordController {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "导出失败: " + e.getMessage());
         }
     }
+
+    @GetMapping("/my/total-score")
+    @Operation(summary = "获取我的网上评教总得分（加权平均分）")
+    public BaseResponse<BigDecimal> getMyTotalScore(HttpServletRequest httpRequest) {
+        User loginUser = userService.getLoginUser(httpRequest);
+        return ResultUtils.success(onlineEvaluationRecordService.getMyTotalScore(loginUser.getId()));
+    }
 }

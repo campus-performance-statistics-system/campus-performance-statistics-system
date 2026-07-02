@@ -126,6 +126,8 @@ public class OnlineEvaluationRecordServiceImpl
         if (record == null) return null;
         OnlineEvaluationRecordVO vo = new OnlineEvaluationRecordVO();
         BeanUtil.copyProperties(record, vo);
+        // 网上评教的"我的得分"即为该记录的平均分
+        vo.setMyScoreDisplay(record.getAverageScore());
 
         if (record.getUserId() != null) {
             User u = userMapper.selectOneById(record.getUserId());
@@ -199,6 +201,30 @@ public class OnlineEvaluationRecordServiceImpl
         Page<OnlineEvaluationRecordVO> voPage = new Page<>(pageNum, pageSize, recordPage.getTotalRow());
         voPage.setRecords(voList);
         return voPage;
+    }
+
+    // ==================== 总得分 ====================
+
+    @Override
+    public BigDecimal getMyTotalScore(Long userId) {
+        // 计算用户的加权平均分：SUM(averageScore * participantCount) / SUM(participantCount)
+        List<OnlineEvaluationRecord> records = this.list(
+                QueryWrapper.create().eq("user_id", userId));
+        if (records.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal totalWeightedScore = BigDecimal.ZERO;
+        int totalParticipants = 0;
+        for (OnlineEvaluationRecord r : records) {
+            BigDecimal score = r.getAverageScore() != null ? r.getAverageScore() : BigDecimal.ZERO;
+            int count = r.getParticipantCount() != null ? r.getParticipantCount() : 0;
+            totalWeightedScore = totalWeightedScore.add(score.multiply(BigDecimal.valueOf(count)));
+            totalParticipants += count;
+        }
+        if (totalParticipants > 0) {
+            return totalWeightedScore.divide(BigDecimal.valueOf(totalParticipants), 2, RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ZERO;
     }
 
     // ==================== 审核 ====================
