@@ -260,11 +260,13 @@ public class ThesisRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 在得分表中被分配了得分的作者，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .eq("thesis_level", req.getThesisLevel())
                 .like("thesis_name", req.getThesisName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR id IN (SELECT record_id FROM thesis_score WHERE user_id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<ThesisRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

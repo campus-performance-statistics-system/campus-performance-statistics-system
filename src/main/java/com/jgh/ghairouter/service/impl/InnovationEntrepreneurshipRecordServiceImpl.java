@@ -270,11 +270,13 @@ public class InnovationEntrepreneurshipRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 在得分表中被分配了得分的成员，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .eq("project_level", req.getProjectLevel())
                 .like("project_name", req.getProjectName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR id IN (SELECT record_id FROM innovation_entrepreneurship_score WHERE user_id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<InnovationEntrepreneurshipRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

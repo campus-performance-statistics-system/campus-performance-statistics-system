@@ -163,10 +163,12 @@ public class InvigilationRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 被记录的监考老师本人，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("teacher_name", req.getTeacherName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR teacher_name = (SELECT user_name FROM user WHERE id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<InvigilationRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

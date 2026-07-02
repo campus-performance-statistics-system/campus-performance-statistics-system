@@ -264,11 +264,13 @@ public class SportsEventRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 在得分表中被分配了得分的参与者，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .eq("event_type", req.getEventType())
                 .like("event_name", req.getEventName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR id IN (SELECT record_id FROM sports_event_score WHERE user_id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<SportsEventRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

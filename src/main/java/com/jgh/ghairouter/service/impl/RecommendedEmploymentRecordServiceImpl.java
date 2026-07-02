@@ -168,11 +168,13 @@ public class RecommendedEmploymentRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 被记录的联系人本人，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("teacher_name", req.getTeacherName())
                 .like("company_name", req.getCompanyName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR teacher_name = (SELECT user_name FROM user WHERE id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<RecommendedEmploymentRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

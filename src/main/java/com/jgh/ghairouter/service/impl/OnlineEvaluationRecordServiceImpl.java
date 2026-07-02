@@ -183,6 +183,7 @@ public class OnlineEvaluationRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 被评教的教师本人，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("teacher_name", req.getTeacherName())
@@ -191,7 +192,8 @@ public class OnlineEvaluationRecordServiceImpl
                 .eq("semester", req.getSemester())
                 .like("course_code", req.getCourseCode())
                 .like("course_name", req.getCourseName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR teacher_name = (SELECT user_name FROM user WHERE id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<OnlineEvaluationRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

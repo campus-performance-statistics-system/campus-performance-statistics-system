@@ -315,11 +315,13 @@ public class PartTimeClassAdvisorRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 在得分表中被分配了得分的班主任，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("teacher_name", req.getTeacherName())
                 .like("class_id", req.getClassId())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR id IN (SELECT record_id FROM part_time_class_advisor_score WHERE user_id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<PartTimeClassAdvisorRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

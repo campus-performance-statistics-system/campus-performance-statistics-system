@@ -273,10 +273,12 @@ public class TrainingGuidanceRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 在得分表中被分配了得分的教师，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("training_name", req.getTrainingName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR id IN (SELECT record_id FROM training_guidance_score WHERE user_id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<TrainingGuidanceRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);

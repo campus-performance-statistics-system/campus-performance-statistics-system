@@ -167,12 +167,14 @@ public class CooperativeEnterpriseRecordServiceImpl
         long pageNum = req.getPageNum();
         long pageSize = req.getPageSize();
 
+        // 提交人 OR 签订合作企业的老师本人，均可看到记录
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq("id", req.getId())
                 .like("teacher_name", req.getTeacherName())
                 .like("college", req.getCollege())
                 .like("enterprise_name", req.getEnterpriseName())
-                .where("user_id = ?", userId);
+                .where("(user_id = ? OR teacher_name = (SELECT user_name FROM user WHERE id = ? AND is_delete = 0))",
+                       userId, userId);
         wrapper.orderBy("create_time", false);
 
         Page<CooperativeEnterpriseRecord> recordPage = this.page(Page.of(pageNum, pageSize), wrapper);
