@@ -29,6 +29,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -108,6 +109,7 @@ public class TeacherCompetitionRecordServiceImpl
     // ==================== 用户提交比赛记录 ====================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long addRecord(Long userId, String typeName,
                           String competitionName, String sponsorUnit,
                           String competitionRank, String gradeName, BigDecimal baseScore,
@@ -183,6 +185,7 @@ public class TeacherCompetitionRecordServiceImpl
     // ==================== 管理员添加比赛记录 ====================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long adminAddRecord(Long adminId, String typeName,
                                 String competitionName, String sponsorUnit,
                                 String competitionRank, String gradeName, BigDecimal baseScore,
@@ -533,6 +536,7 @@ public class TeacherCompetitionRecordServiceImpl
     // ==================== 审核 ====================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
         if (recordId == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "记录ID不能为空");
         if (StrUtil.isBlank(reviewStatus)) throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核状态不能为空");

@@ -22,6 +22,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -51,6 +52,7 @@ public class TeachingReformRecordServiceImpl
 
     private static final String DEFAULT_TYPE_NAME = "教改科研项目业绩";
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public Long addRecord(Long userId,
                           String projectName,
@@ -165,6 +167,7 @@ public class TeachingReformRecordServiceImpl
             }
         } catch (Exception e) {
             log.error("解析成员数据JSON失败: {}", memberData, e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存得分失败");
         }
     }
 
@@ -307,6 +310,7 @@ public class TeachingReformRecordServiceImpl
 
     // ==================== 审核 ====================
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
         if (recordId == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "记录ID不能为空");

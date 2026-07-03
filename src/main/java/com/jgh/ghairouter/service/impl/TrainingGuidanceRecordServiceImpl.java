@@ -22,6 +22,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -52,6 +53,7 @@ public class TrainingGuidanceRecordServiceImpl
     private static final String DEFAULT_TYPE_NAME = "指导实训";
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long addRecord(Long userId,
                           String semester, String trainingName,
                           String responsibleTeachers, String participatingTeachers,
@@ -141,6 +143,7 @@ public class TrainingGuidanceRecordServiceImpl
                 }
             } catch (Exception e) {
                 log.error("解析负责并指导教师JSON失败: {}", responsibleTeachers, e);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存负责并指导教师得分失败");
             }
         }
 
@@ -176,6 +179,7 @@ public class TrainingGuidanceRecordServiceImpl
                 }
             } catch (Exception e) {
                 log.error("解析参与教师JSON失败: {}", participatingTeachers, e);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存参与教师得分失败");
             }
         }
     }
@@ -337,6 +341,7 @@ public class TrainingGuidanceRecordServiceImpl
     // ==================== 审核 ====================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
         if (recordId == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "记录ID不能为空");
         if (StrUtil.isBlank(reviewStatus)) throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核状态不能为空");

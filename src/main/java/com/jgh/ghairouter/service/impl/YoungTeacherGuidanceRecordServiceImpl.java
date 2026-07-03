@@ -24,6 +24,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -50,6 +51,7 @@ public class YoungTeacherGuidanceRecordServiceImpl
 
     private static final String DEFAULT_TYPE_NAME = YoungTeacherGuidanceScoringConstants.TYPE_NAME;
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public Long addRecord(Long userId,
                           String college,
@@ -190,6 +192,7 @@ public class YoungTeacherGuidanceRecordServiceImpl
 
     // ==================== 审核 ====================
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public void adminReview(Long recordId, String reviewStatus, String reviewComment, Long adminId) {
         if (recordId == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "记录ID不能为空");
