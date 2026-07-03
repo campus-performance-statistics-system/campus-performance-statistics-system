@@ -380,8 +380,8 @@ public class TrainingGuidanceRecordServiceImpl
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
 
-            // 表头：序号、时间、实训名称、负责并指导教师、参与教师、空列
-            String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师", ""};
+            // 表头：序号、时间、实训名称、负责并指导教师、参与教师、空列、总计得分（合并列）
+            String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师", "", "总计得分"};
 
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("指导实训");
 
@@ -391,11 +391,20 @@ public class TrainingGuidanceRecordServiceImpl
             headerStyle.setFont(headerFont);
 
             org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
+            for (int i = 0; i < 5; i++) {
                 org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
                 cell.setCellStyle(headerStyle);
             }
+            // 空列（列5）
+            headerRow.createCell(5).setCellValue("");
+
+            // 总计得分标题（列6），合并列6-7
+            org.apache.poi.ss.usermodel.Cell totalTitleCell = headerRow.createCell(6);
+            totalTitleCell.setCellValue("总计得分");
+            totalTitleCell.setCellStyle(headerStyle);
+            // 合并单元格：行0列6 到 行0列7
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 6, 7));
 
             // 查询所有记录
             List<TrainingGuidanceRecord> allRecords = this.list(
@@ -421,19 +430,6 @@ public class TrainingGuidanceRecordServiceImpl
                         TrainingScoringConstants.PARTICIPATING_SCORE));
             }
 
-            // 空一行后添加总计得分
-            rowIdx++; // 空一行
-            org.apache.poi.ss.usermodel.CellStyle totalHeaderStyle = workbook.createCellStyle();
-            org.apache.poi.ss.usermodel.Font totalHeaderFont = workbook.createFont();
-            totalHeaderFont.setBold(true);
-            totalHeaderFont.setFontHeightInPoints((short) 14);
-            totalHeaderStyle.setFont(totalHeaderFont);
-
-            org.apache.poi.ss.usermodel.Row totalTitleRow = sheet.createRow(rowIdx++);
-            org.apache.poi.ss.usermodel.Cell totalTitleCell = totalTitleRow.createCell(3);
-            totalTitleCell.setCellValue("总计得分");
-            totalTitleCell.setCellStyle(totalHeaderStyle);
-
             // 查询所有教师得分汇总
             List<TrainingGuidanceScore> allScores = trainingScoreMapper.selectListByQuery(
                     QueryWrapper.create().eq("is_delete", 0));
@@ -453,15 +449,21 @@ public class TrainingGuidanceRecordServiceImpl
             scoreFont.setBold(true);
             scoreStyle.setFont(scoreFont);
 
+            // 在右侧列（列6-7）填写总计得分数据，从第1行开始
+            int scoreRowIdx = 1;
             for (Map.Entry<String, BigDecimal> entry : sortedEntries) {
-                org.apache.poi.ss.usermodel.Row scoreRow = sheet.createRow(rowIdx++);
-                scoreRow.createCell(3).setCellValue(entry.getKey());
-                org.apache.poi.ss.usermodel.Cell scoreCell = scoreRow.createCell(4);
+                org.apache.poi.ss.usermodel.Row row = sheet.getRow(scoreRowIdx);
+                if (row == null) {
+                    row = sheet.createRow(scoreRowIdx);
+                }
+                row.createCell(6).setCellValue(entry.getKey());
+                org.apache.poi.ss.usermodel.Cell scoreCell = row.createCell(7);
                 scoreCell.setCellValue(entry.getValue().stripTrailingZeros().toPlainString());
                 scoreCell.setCellStyle(scoreStyle);
+                scoreRowIdx++;
             }
 
-            for (int i = 0; i < headers.length; i++) {
+            for (int i = 0; i < 8; i++) {
                 sheet.autoSizeColumn(i);
             }
 
