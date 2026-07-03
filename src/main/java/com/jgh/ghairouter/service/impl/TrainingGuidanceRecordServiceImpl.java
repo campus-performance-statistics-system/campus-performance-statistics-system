@@ -412,11 +412,14 @@ public class TrainingGuidanceRecordServiceImpl
 
             int rowIdx = 1;
             int seq = 1;
+            String prevSemester = null;
+            int mergeStartRow = 1; // 当前合并起始行
 
             for (TrainingGuidanceRecord record : allRecords) {
-                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx);
                 row.createCell(0).setCellValue(seq++);
-                row.createCell(1).setCellValue(record.getSemester() != null ? record.getSemester() : "");
+                String semester = record.getSemester() != null ? record.getSemester() : "";
+                row.createCell(1).setCellValue(semester);
 
                 // 实训名称
                 row.createCell(2).setCellValue(record.getTrainingName() != null ? record.getTrainingName() : "");
@@ -428,6 +431,25 @@ public class TrainingGuidanceRecordServiceImpl
                 // 参与教师：格式化为 "王五（1）、赵六（1）"
                 row.createCell(4).setCellValue(formatTeacherNames(record.getParticipatingTeachers(),
                         TrainingScoringConstants.PARTICIPATING_SCORE));
+
+                // 判断是否需要合并时间列单元格
+                if (prevSemester != null && !prevSemester.equals(semester)) {
+                    // 学期发生变化，合并之前相同学期的连续行（rowIdx-1 是上一组的最后一行）
+                    int lastRowOfPrevGroup = rowIdx - 1;
+                    if (mergeStartRow < lastRowOfPrevGroup) {
+                        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(
+                                mergeStartRow, lastRowOfPrevGroup, 1, 1));
+                    }
+                    mergeStartRow = rowIdx;
+                }
+                prevSemester = semester;
+                rowIdx++;
+            }
+            // 合并最后一组
+            int lastDataRow = rowIdx - 1;
+            if (mergeStartRow < lastDataRow) {
+                sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(
+                        mergeStartRow, lastDataRow, 1, 1));
             }
 
             // 查询所有教师得分汇总
