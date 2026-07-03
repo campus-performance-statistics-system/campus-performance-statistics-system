@@ -25,6 +25,9 @@ public class UserScoreStatisticsVO implements Serializable {
     /** 用户ID */
     private Long userId;
 
+    /** 用户工号（账号） */
+    private String userAccount;
+
     /** 用户姓名 */
     private String userName;
 

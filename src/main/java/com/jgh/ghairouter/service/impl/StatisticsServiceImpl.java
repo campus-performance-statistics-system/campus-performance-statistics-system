@@ -169,6 +169,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String TEACHER_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(
                 tcs.personal_score + CASE WHEN tcs.is_leader = 1 THEN 2 ELSE 0 END
@@ -176,7 +177,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             FROM user u
             INNER JOIN user_competition_score tcs ON u.id = tcs.user_id AND tcs.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -185,12 +186,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String STUDENT_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(ascore.total_score), 0) AS total_score
             FROM user u
             INNER JOIN advisor_score ascore ON u.id = ascore.user_id AND ascore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -199,12 +201,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String TRAINING_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(tscore.score), 0) AS total_score
             FROM user u
             INNER JOIN training_guidance_score tscore ON u.id = tscore.user_id AND tscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -213,12 +216,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String RESEARCH_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(rscore.score), 0) AS total_score
             FROM user u
             INNER JOIN research_achievement_score rscore ON u.id = rscore.user_id AND rscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -227,12 +231,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String INNOVATION_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(iscore.score), 0) AS total_score
             FROM user u
             INNER JOIN innovation_entrepreneurship_score iscore ON u.id = iscore.user_id AND iscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -241,12 +246,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String TEACHING_REFORM_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(trscore.score), 0) AS total_score
             FROM user u
             INNER JOIN teaching_reform_score trscore ON u.id = trscore.user_id AND trscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -255,12 +261,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String THESIS_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(tscore.score), 0) AS total_score
             FROM user u
             INNER JOIN thesis_score tscore ON u.id = tscore.user_id AND tscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -269,12 +276,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String SPORTS_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(sscore.score), 0) AS total_score
             FROM user u
             INNER JOIN sports_event_score sscore ON u.id = sscore.user_id AND sscore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -283,12 +291,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String ADVISOR_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(SUM(ascore.score), 0) AS total_score
             FROM user u
             INNER JOIN part_time_class_advisor_score ascore ON u.id = ascore.user_id AND ascore.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -297,6 +306,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String ONLINE_EVAL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               CASE WHEN SUM(rec.participant_count) > 0
                 THEN ROUND(SUM(rec.average_score * rec.participant_count) / SUM(rec.participant_count), 2)
@@ -305,7 +315,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             FROM user u
             INNER JOIN online_evaluation_record rec ON u.id = rec.user_id AND rec.is_delete = 0
             WHERE u.is_delete = 0
-            GROUP BY u.id, u.user_name
+            GROUP BY u.id, u.user_account, u.user_name
             """;
 
     /**
@@ -314,6 +324,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private static final String ALL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
+              u.user_account,
               u.user_name,
               COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) + COALESCE(trscore.teaching_reform_score, 0) + COALESCE(thscore.thesis_score, 0) + COALESCE(sscore.sports_score, 0) + COALESCE(advscore.advisor_score, 0) + COALESCE(oescore.online_eval_score, 0) AS total_score
             FROM user u
@@ -405,7 +416,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     @Override
-    public List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder, String userName) {
+    public List<UserScoreStatisticsVO> getUserScoreStatistics(String type, String sortOrder, String keyword) {
         String sql;
         if ("teacher".equals(type)) {
             sql = TEACHER_SCORE_SQL;
@@ -432,14 +443,16 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = ALL_SCORE_SQL;
         }
 
-        // 参数列表（用于模糊查询用户名）
+        // 参数列表
         List<Object> params = new ArrayList<>();
 
-        // 如果指定了用户名，在 WHERE 条件后追加模糊匹配
-        if (userName != null && !userName.isBlank()) {
+        // 如果指定了关键字，同时模糊匹配工号和姓名
+        if (keyword != null && !keyword.isBlank()) {
+            String likePattern = "%" + keyword.trim() + "%";
             sql = sql.replace("WHERE u.is_delete = 0",
-                    "WHERE u.is_delete = 0 AND u.user_name LIKE ?");
-            params.add("%" + userName.trim() + "%");
+                    "WHERE u.is_delete = 0 AND (u.user_account LIKE ? OR u.user_name LIKE ?)");
+            params.add(likePattern);
+            params.add(likePattern);
         }
 
         boolean asc = "ascend".equals(sortOrder);
@@ -456,6 +469,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         for (Map<String, Object> row : rows) {
             result.add(UserScoreStatisticsVO.builder()
                     .userId(toLong(row.get("user_id")))
+                    .userAccount((String) row.get("user_account"))
                     .userName((String) row.get("user_name"))
                     .totalScore(toBigDecimal(row.get("total_score")))
                     .build());
