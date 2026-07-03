@@ -26,7 +26,7 @@ public final class TrainingScoringConstants {
     public static final String ROLE_PARTICIPATING = "participating";
 
     /** 角色显示名称 */
-    public static final String ROLE_RESPONSIBLE_TEXT = "负责教师";
+    public static final String ROLE_RESPONSIBLE_TEXT = "负责并指导教师";
     public static final String ROLE_PARTICIPATING_TEXT = "参与教师";
 
     /**
@@ -36,7 +36,7 @@ public final class TrainingScoringConstants {
         List<Map<String, Object>> rules = new ArrayList<>();
 
         Map<String, Object> responsibleRule = new LinkedHashMap<>();
-        responsibleRule.put("type", "负责教师得分");
+        responsibleRule.put("type", "负责并指导教师得分");
         responsibleRule.put("role", ROLE_RESPONSIBLE_TEXT);
         responsibleRule.put("score", RESPONSIBLE_SCORE);
         responsibleRule.put("note", "负责组织并指导实训：2分/门");

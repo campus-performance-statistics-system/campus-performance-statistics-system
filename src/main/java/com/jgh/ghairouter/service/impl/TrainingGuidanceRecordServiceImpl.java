@@ -108,7 +108,7 @@ public class TrainingGuidanceRecordServiceImpl
     private void saveTrainingScores(Long recordId, String responsibleTeachers, String participatingTeachers) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 保存负责教师得分（2分/人）
+        // 保存负责并指导教师得分（2分/人）
         if (StrUtil.isNotBlank(responsibleTeachers)) {
             try {
                 JSONArray arr = new JSONArray(responsibleTeachers);
@@ -140,7 +140,7 @@ public class TrainingGuidanceRecordServiceImpl
                     trainingScoreMapper.insert(score);
                 }
             } catch (Exception e) {
-                log.error("解析负责教师JSON失败: {}", responsibleTeachers, e);
+                log.error("解析负责并指导教师JSON失败: {}", responsibleTeachers, e);
             }
         }
 
@@ -380,8 +380,8 @@ public class TrainingGuidanceRecordServiceImpl
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
 
-            // 表头：时间、实训名称、负责教师、参与教师
-            String[] headers = {"序号", "时间", "实训名称", "负责教师", "参与教师"};
+            // 表头：时间、实训名称、负责并指导教师、参与教师
+            String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师"};
 
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("指导实训");
 
@@ -412,7 +412,7 @@ public class TrainingGuidanceRecordServiceImpl
                 // 实训名称
                 row.createCell(2).setCellValue(record.getTrainingName() != null ? record.getTrainingName() : "");
 
-                // 负责教师：格式化为 "张三（2）、李四（2）"
+                // 负责并指导教师：格式化为 "张三（2）、李四（2）"
                 row.createCell(3).setCellValue(formatTeacherNames(record.getResponsibleTeachers(),
                         TrainingScoringConstants.RESPONSIBLE_SCORE));
 

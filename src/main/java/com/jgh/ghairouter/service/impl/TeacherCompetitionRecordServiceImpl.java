@@ -706,7 +706,7 @@ public class TeacherCompetitionRecordServiceImpl
 
             // ========== Sheet 3：指导实训 ==========
             {
-                String[] headers = {"序号", "时间", "实训名称", "负责教师", "参与教师"};
+                String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师"};
                 org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("3-指导实训");
 
                 org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
