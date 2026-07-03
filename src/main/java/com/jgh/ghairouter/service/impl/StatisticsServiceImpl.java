@@ -278,13 +278,44 @@ public class StatisticsServiceImpl implements StatisticsService {
             """;
 
     /**
-     * 所有比赛总分（八类业绩得分合并，不含兼职班主任）
+     * 兼职班主任总分（part_time_class_advisor_score 表）
+     */
+    private static final String ADVISOR_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              COALESCE(SUM(ascore.score), 0) AS total_score
+            FROM user u
+            INNER JOIN part_time_class_advisor_score ascore ON u.id = ascore.user_id AND ascore.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 网上评教总分（online_evaluation_record 表，加权平均分）
+     */
+    private static final String ONLINE_EVAL_SCORE_SQL = """
+            SELECT
+              u.id AS user_id,
+              u.user_name,
+              CASE WHEN SUM(rec.participant_count) > 0
+                THEN ROUND(SUM(rec.average_score * rec.participant_count) / SUM(rec.participant_count), 2)
+                ELSE 0
+              END AS total_score
+            FROM user u
+            INNER JOIN online_evaluation_record rec ON u.id = rec.user_id AND rec.is_delete = 0
+            WHERE u.is_delete = 0
+            GROUP BY u.id, u.user_name
+            """;
+
+    /**
+     * 全部比赛总分（十类业绩得分合并）
      */
     private static final String ALL_SCORE_SQL = """
             SELECT
               u.id AS user_id,
               u.user_name,
-              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) + COALESCE(trscore.teaching_reform_score, 0) + COALESCE(thscore.thesis_score, 0) + COALESCE(sscore.sports_score, 0) AS total_score
+              COALESCE(tcs.teacher_score, 0) + COALESCE(ascore.student_score, 0) + COALESCE(tscore.training_score, 0) + COALESCE(rscore.research_score, 0) + COALESCE(iscore.innovation_score, 0) + COALESCE(trscore.teaching_reform_score, 0) + COALESCE(thscore.thesis_score, 0) + COALESCE(sscore.sports_score, 0) + COALESCE(advscore.advisor_score, 0) + COALESCE(oescore.online_eval_score, 0) AS total_score
             FROM user u
             LEFT JOIN (
               SELECT
@@ -350,8 +381,27 @@ public class StatisticsServiceImpl implements StatisticsService {
               WHERE is_delete = 0
               GROUP BY user_id
             ) sscore ON u.id = sscore.user_id
+            LEFT JOIN (
+              SELECT
+                user_id,
+                SUM(score) AS advisor_score
+              FROM part_time_class_advisor_score
+              WHERE is_delete = 0
+              GROUP BY user_id
+            ) advscore ON u.id = advscore.user_id
+            LEFT JOIN (
+              SELECT
+                user_id,
+                CASE WHEN SUM(participant_count) > 0
+                  THEN SUM(average_score * participant_count) / SUM(participant_count)
+                  ELSE 0
+                END AS online_eval_score
+              FROM online_evaluation_record
+              WHERE is_delete = 0
+              GROUP BY user_id
+            ) oescore ON u.id = oescore.user_id
             WHERE u.is_delete = 0
-              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL OR iscore.innovation_score IS NOT NULL OR trscore.teaching_reform_score IS NOT NULL OR thscore.thesis_score IS NOT NULL OR sscore.sports_score IS NOT NULL)
+              AND (tcs.teacher_score IS NOT NULL OR ascore.student_score IS NOT NULL OR tscore.training_score IS NOT NULL OR rscore.research_score IS NOT NULL OR iscore.innovation_score IS NOT NULL OR trscore.teaching_reform_score IS NOT NULL OR thscore.thesis_score IS NOT NULL OR sscore.sports_score IS NOT NULL OR advscore.advisor_score IS NOT NULL OR oescore.online_eval_score IS NOT NULL)
             """;
 
     @Override
@@ -373,8 +423,12 @@ public class StatisticsServiceImpl implements StatisticsService {
             sql = THESIS_SCORE_SQL;
         } else if ("sports".equals(type)) {
             sql = SPORTS_SCORE_SQL;
+        } else if ("advisor".equals(type)) {
+            sql = ADVISOR_SCORE_SQL;
+        } else if ("onlineEvaluation".equals(type)) {
+            sql = ONLINE_EVAL_SCORE_SQL;
         } else {
-            // "all" — 合并所有
+            // "all" — 合并全部十类
             sql = ALL_SCORE_SQL;
         }
 
