@@ -111,8 +111,8 @@ public class TeacherCompetitionRecordServiceImpl
     public Long addRecord(Long userId, String typeName,
                           String competitionName, String sponsorUnit,
                           String competitionRank, String gradeName, BigDecimal baseScore,
-                          Integer teamMemberNum, Long firstAuthorId,
-                          List<Long> otherAuthorIds, MultipartFile file,
+                          Integer teamMemberNum, String firstAuthorName,
+                          List<String> otherAuthorNames, MultipartFile file,
                           String scoreData) {
         int memberNum = teamMemberNum != null && teamMemberNum > 0 ? teamMemberNum : 1;
 
@@ -123,6 +123,16 @@ public class TeacherCompetitionRecordServiceImpl
                     ? Base64.getEncoder().encodeToString(file.getBytes()) : null;
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "读取文件失败");
+        }
+
+        // 按姓名反查用户ID
+        Long firstAuthorId = null;
+        if (StrUtil.isNotBlank(firstAuthorName)) {
+            User leader = userMapper.selectOneByQuery(
+                    QueryWrapper.create().eq("user_name", firstAuthorName.trim()));
+            if (leader != null) {
+                firstAuthorId = leader.getId();
+            }
         }
 
         // 构建记录
@@ -136,9 +146,9 @@ public class TeacherCompetitionRecordServiceImpl
         record.setBaseScore(baseScore);
         record.setTeamMemberNum(memberNum);
         record.setFirstAuthorId(firstAuthorId);
-        if (CollUtil.isNotEmpty(otherAuthorIds)) {
-            record.setOtherAuthorIds(otherAuthorIds.stream()
-                    .map(String::valueOf).collect(Collectors.joining(",")));
+        if (CollUtil.isNotEmpty(otherAuthorNames)) {
+            record.setOtherAuthorIds(String.join(",", otherAuthorNames.stream()
+                    .filter(StrUtil::isNotBlank).map(String::trim).toList()));
         }
         record.setProofImageData(base64);
         record.setScoreData(scoreData);
@@ -313,7 +323,7 @@ public class TeacherCompetitionRecordServiceImpl
 
     /**
      * 从前端提交的 scoreData JSON 解析并保存得分明细。
-     * scoreData 格式: [{"userId":1,"score":0.75},{"userId":2,"score":0.25}]
+     * scoreData 格式: [{"teacherName":"张三","score":0.75},{"teacherName":"李四","score":0.25}]
      * score 字段是获奖加分（不含负责人基础2分），第一项始终是负责人。
      */
     private void saveScoresFromData(Long recordId, String scoreData) {
@@ -322,11 +332,21 @@ public class TeacherCompetitionRecordServiceImpl
             LocalDateTime now = LocalDateTime.now();
             for (int i = 0; i < arr.size(); i++) {
                 JSONObject entry = arr.getJSONObject(i);
-                long userId = entry.getLong("userId");
+                String teacherName = entry.getStr("teacherName");
                 BigDecimal bonusScore = BigDecimal.valueOf(entry.getDouble("score"))
                         .setScale(3, RoundingMode.HALF_UP);
                 int isLeader = (i == 0) ? 1 : 0;
-                teacherScoreMapper.insert(buildScore(recordId, userId, bonusScore, isLeader, now));
+
+                // 按姓名反查用户ID
+                Long teacherUserId = null;
+                if (StrUtil.isNotBlank(teacherName)) {
+                    User teacher = userMapper.selectOneByQuery(
+                            QueryWrapper.create().eq("user_name", teacherName.trim()));
+                    if (teacher != null) {
+                        teacherUserId = teacher.getId();
+                    }
+                }
+                teacherScoreMapper.insert(buildScore(recordId, teacherUserId, bonusScore, isLeader, now));
             }
         } catch (Exception e) {
             log.error("解析 scoreData 失败: {}", scoreData, e);
@@ -339,6 +359,7 @@ public class TeacherCompetitionRecordServiceImpl
         TeacherCompetitionScore ts = new TeacherCompetitionScore();
         ts.setRecordId(recordId);
         ts.setTeacherUserId(userId);
+        ts.setTypeName(DEFAULT_TYPE_NAME);
         ts.setPersonalScore(score);
         ts.setIsLeader(isLeader);
         ts.setCreateTime(now);
@@ -378,12 +399,20 @@ public class TeacherCompetitionRecordServiceImpl
             if (leader != null) vo.setFirstAuthorName(leader.getUserName());
         }
         if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
-            List<String> names = Arrays.stream(record.getOtherAuthorIds().split(","))
-                    .filter(StrUtil::isNotBlank)
-                    .map(idStr -> {
-                        User u = userMapper.selectOneById(Long.valueOf(idStr.trim()));
-                        return u != null ? u.getUserName() : idStr;
-                    }).collect(Collectors.toList());
+            String[] parts = record.getOtherAuthorIds().split(",");
+            List<String> names = new ArrayList<>();
+            for (String part : parts) {
+                if (StrUtil.isBlank(part)) continue;
+                String trimmed = part.trim();
+                // 尝试按数字ID解析，否则当作姓名直接使用
+                try {
+                    Long uid = Long.valueOf(trimmed);
+                    User u = userMapper.selectOneById(uid);
+                    names.add(u != null ? u.getUserName() : trimmed);
+                } catch (NumberFormatException e) {
+                    names.add(trimmed);
+                }
+            }
             vo.setOtherAuthorNames(String.join("、", names));
         }
 
@@ -543,9 +572,18 @@ public class TeacherCompetitionRecordServiceImpl
                 // 无 scoreData 的旧记录或管理员录入：服务端计算
                 List<Long> otherAuthorIds = new ArrayList<>();
                 if (StrUtil.isNotBlank(record.getOtherAuthorIds())) {
-                    for (String idStr : record.getOtherAuthorIds().split(",")) {
-                        if (StrUtil.isNotBlank(idStr.trim())) {
-                            otherAuthorIds.add(Long.valueOf(idStr.trim()));
+                    for (String part : record.getOtherAuthorIds().split(",")) {
+                        String trimmed = part.trim();
+                        if (StrUtil.isBlank(trimmed)) continue;
+                        try {
+                            otherAuthorIds.add(Long.valueOf(trimmed));
+                        } catch (NumberFormatException e) {
+                            // 如果存的是姓名而非ID，尝试反查
+                            User u = userMapper.selectOneByQuery(
+                                    QueryWrapper.create().eq("user_name", trimmed));
+                            if (u != null) {
+                                otherAuthorIds.add(u.getId());
+                            }
                         }
                     }
                 }

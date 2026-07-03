@@ -49,8 +49,8 @@ public class TeacherCompetitionRecordController {
             @RequestParam("gradeName") String gradeName,
             @RequestParam(value = "baseScore", required = false) BigDecimal baseScore,
             @RequestParam(value = "teamMemberNum", defaultValue = "1") Integer teamMemberNum,
-            @RequestParam("firstAuthorId") Long firstAuthorId,
-            @RequestParam(value = "otherAuthorIds", required = false) List<Long> otherAuthorIds,
+            @RequestParam("firstAuthorName") String firstAuthorName,
+            @RequestParam(value = "otherAuthorNames", required = false) List<String> otherAuthorNames,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "scoreData", required = false) String scoreData,
             HttpServletRequest httpRequest) {
@@ -59,7 +59,7 @@ public class TeacherCompetitionRecordController {
                 loginUser.getId(), typeName,
                 competitionName, sponsorUnit,
                 competitionRank, gradeName, baseScore,
-                teamMemberNum, firstAuthorId, otherAuthorIds, file, scoreData);
+                teamMemberNum, firstAuthorName, otherAuthorNames, file, scoreData);
         return ResultUtils.success(recordId);
     }
 
