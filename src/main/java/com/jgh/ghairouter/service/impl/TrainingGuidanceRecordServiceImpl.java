@@ -380,8 +380,8 @@ public class TrainingGuidanceRecordServiceImpl
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
                      new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
 
-            // 表头：时间、实训名称、负责并指导教师、参与教师
-            String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师"};
+            // 表头：序号、时间、实训名称、负责并指导教师、参与教师、空列
+            String[] headers = {"序号", "时间", "实训名称", "负责并指导教师", "参与教师", ""};
 
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("指导实训");
 
@@ -421,6 +421,46 @@ public class TrainingGuidanceRecordServiceImpl
                         TrainingScoringConstants.PARTICIPATING_SCORE));
             }
 
+            // 空一行后添加总计得分
+            rowIdx++; // 空一行
+            org.apache.poi.ss.usermodel.CellStyle totalHeaderStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font totalHeaderFont = workbook.createFont();
+            totalHeaderFont.setBold(true);
+            totalHeaderFont.setFontHeightInPoints((short) 14);
+            totalHeaderStyle.setFont(totalHeaderFont);
+
+            org.apache.poi.ss.usermodel.Row totalTitleRow = sheet.createRow(rowIdx++);
+            org.apache.poi.ss.usermodel.Cell totalTitleCell = totalTitleRow.createCell(3);
+            totalTitleCell.setCellValue("总计得分");
+            totalTitleCell.setCellStyle(totalHeaderStyle);
+
+            // 查询所有教师得分汇总
+            List<TrainingGuidanceScore> allScores = trainingScoreMapper.selectListByQuery(
+                    QueryWrapper.create().eq("is_delete", 0));
+            Map<String, BigDecimal> teacherTotalMap = new LinkedHashMap<>();
+            for (TrainingGuidanceScore score : allScores) {
+                String name = score.getTeacherName();
+                if (StrUtil.isBlank(name)) continue;
+                teacherTotalMap.merge(name, score.getScore(), BigDecimal::add);
+            }
+
+            // 按总分降序排列
+            List<Map.Entry<String, BigDecimal>> sortedEntries = new ArrayList<>(teacherTotalMap.entrySet());
+            sortedEntries.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+            org.apache.poi.ss.usermodel.CellStyle scoreStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font scoreFont = workbook.createFont();
+            scoreFont.setBold(true);
+            scoreStyle.setFont(scoreFont);
+
+            for (Map.Entry<String, BigDecimal> entry : sortedEntries) {
+                org.apache.poi.ss.usermodel.Row scoreRow = sheet.createRow(rowIdx++);
+                scoreRow.createCell(3).setCellValue(entry.getKey());
+                org.apache.poi.ss.usermodel.Cell scoreCell = scoreRow.createCell(4);
+                scoreCell.setCellValue(entry.getValue().stripTrailingZeros().toPlainString());
+                scoreCell.setCellStyle(scoreStyle);
+            }
+
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }
@@ -431,6 +471,35 @@ public class TrainingGuidanceRecordServiceImpl
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "Excel生成失败: " + e.getMessage());
         }
+    }
+
+    // ==================== 查看分数 ====================
+
+    @Override
+    public List<Map<String, Object>> getTeacherTotalScores() {
+        List<TrainingGuidanceScore> allScores = trainingScoreMapper.selectListByQuery(
+                QueryWrapper.create().eq("is_delete", 0));
+        Map<String, BigDecimal> teacherTotalMap = new LinkedHashMap<>();
+        for (TrainingGuidanceScore score : allScores) {
+            String name = score.getTeacherName();
+            if (StrUtil.isBlank(name)) continue;
+            teacherTotalMap.merge(name, score.getScore(), BigDecimal::add);
+        }
+
+        // 按总分降序排列
+        List<Map.Entry<String, BigDecimal>> sortedEntries = new ArrayList<>(teacherTotalMap.entrySet());
+        sortedEntries.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        int rank = 1;
+        for (Map.Entry<String, BigDecimal> entry : sortedEntries) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("rank", rank++);
+            item.put("teacherName", entry.getKey());
+            item.put("totalScore", entry.getValue().stripTrailingZeros().toPlainString());
+            result.add(item);
+        }
+        return result;
     }
 
     /**

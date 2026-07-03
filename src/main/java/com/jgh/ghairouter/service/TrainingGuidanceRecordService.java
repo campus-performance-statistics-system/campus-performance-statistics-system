@@ -9,6 +9,8 @@ import com.mybatisflex.core.service.IService;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 指导实训记录 服务层（v4）
@@ -39,4 +41,9 @@ public interface TrainingGuidanceRecordService extends IService<TrainingGuidance
      * 导出所有记录为Excel
      */
     byte[] exportRecordsToExcel();
+
+    /**
+     * 获取所有教师的总得分汇总（按教师姓名分组求和，按分数降序）
+     */
+    List<Map<String, Object>> getTeacherTotalScores();
 }

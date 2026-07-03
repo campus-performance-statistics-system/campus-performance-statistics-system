@@ -144,4 +144,11 @@ public class TrainingGuidanceRecordController {
         result.put("rules", TrainingScoringConstants.getAllScoringRules());
         return ResultUtils.success(result);
     }
+
+    @GetMapping("/admin/teacher-scores")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "获取所有教师总得分汇总")
+    public BaseResponse<java.util.List<java.util.Map<String, Object>>> getTeacherTotalScores() {
+        return ResultUtils.success(trainingGuidanceRecordService.getTeacherTotalScores());
+    }
 }

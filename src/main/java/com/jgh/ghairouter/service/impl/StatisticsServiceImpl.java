@@ -20,7 +20,7 @@ import com.jgh.ghairouter.mapper.SportsEventRecordMapper;
 import com.jgh.ghairouter.mapper.SportsEventScoreMapper;
 import com.jgh.ghairouter.mapper.TeachingReformRecordMapper;
 import com.jgh.ghairouter.mapper.ThesisRecordMapper;
-import com.jgh.ghairouter.mapper.TrainingGuidanceRecordMapper;
+
 import com.jgh.ghairouter.mapper.UserMapper;
 import com.jgh.ghairouter.model.entity.CooperativeEnterpriseRecord;
 import com.jgh.ghairouter.model.entity.ExcellentGraduationProjectRecord;
@@ -37,7 +37,7 @@ import com.jgh.ghairouter.model.entity.StudentCompetitionRecord;
 import com.jgh.ghairouter.model.entity.TeacherCompetitionRecord;
 import com.jgh.ghairouter.model.entity.TeachingReformRecord;
 import com.jgh.ghairouter.model.entity.ThesisRecord;
-import com.jgh.ghairouter.model.entity.TrainingGuidanceRecord;
+
 import com.jgh.ghairouter.model.entity.User;
 import com.jgh.ghairouter.model.vo.UserScoreStatisticsVO;
 import com.jgh.ghairouter.service.*;
@@ -75,9 +75,6 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Resource
     private StudentCompetitionRecordMapper studentRecordMapper;
-
-    @Resource
-    private TrainingGuidanceRecordMapper trainingRecordMapper;
 
     @Resource
     private ResearchAchievementRecordMapper researchRecordMapper;
@@ -475,34 +472,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                 seq++;
             }
 
-            // ---- 3-指导实训 ----
-            String dir3 = "所有附件/3-指导实训/";
-            ensureZipDir(zos, dir3);
-            List<TrainingGuidanceRecord> trainingRecords = trainingRecordMapper.selectListByQuery(
-                    QueryWrapper.create().orderBy("create_time", true));
-            seq = 1;
-            for (TrainingGuidanceRecord record : trainingRecords) {
-                if (StrUtil.isBlank(record.getProofImageData())) {
-                    continue;
-                }
-                String trainingName = sanitizeFilename(
-                        StrUtil.isNotBlank(record.getTrainingName())
-                                ? record.getTrainingName() : "未知实训");
-                String semester = StrUtil.isNotBlank(record.getSemester())
-                        ? "-" + sanitizeFilename(record.getSemester()) : "";
-                String userName = sanitizeFilename(getUserName(record.getUserId()));
-                String fileName = seq + "-" + trainingName + semester + "-" + userName + ".png";
-                String zipPath = dir3 + fileName;
-
-                byte[] imageBytes = decodeBase64(record.getProofImageData(), record.getId());
-                if (imageBytes == null) continue;
-
-                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(zipPath);
-                zos.putNextEntry(entry);
-                zos.write(imageBytes);
-                zos.closeEntry();
-                seq++;
-            }
+            // ---- 3-指导实训（不需要导出附件，跳过） ----
 
             // ---- 4-科研及教材业绩 ----
             String dir4 = "所有附件/4-科研及教材业绩/";
