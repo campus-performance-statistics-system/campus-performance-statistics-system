@@ -625,7 +625,7 @@ public class TeacherCompetitionRecordServiceImpl
 
             // ========== Sheet 1：教师获奖 ==========
             {
-                String[] headers = {"序号", "竞赛名称", "颁奖单位", "获奖级别", "等级", "获奖教师及得分"};
+                String[] headers = {"序号", "竞赛名称", "颁奖单位", "获奖级别", "等级", "获奖教师及得分", "", "个人业务比赛", "", "奖励（附加）"};
                 org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("1-教师获奖");
 
                 org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
@@ -666,7 +666,47 @@ public class TeacherCompetitionRecordServiceImpl
                         row.createCell(5).setCellValue(sb.toString());
                     }
                 }
-                for (int i = 0; i < headers.length; i++) {
+
+                // ========== 教师汇总数据 ==========
+                rowIdx++; // 空行分隔
+                org.apache.poi.ss.usermodel.Row noteRow = sheet.createRow(rowIdx++);
+                noteRow.createCell(0).setCellValue("注：");
+                noteRow.createCell(1).setCellValue("个人业务比赛");
+
+                // 查询所有教师获奖得分明细
+                List<TeacherCompetitionScore> allScores = teacherScoreMapper.selectListByQuery(
+                        QueryWrapper.create().eq("type_name", "教师获奖"));
+
+                // 按 user_id 聚合总分（personal_score + leader基础2分）
+                Map<Long, BigDecimal> teacherTotalMap = new LinkedHashMap<>();
+                Map<Long, String> teacherNameMap = new LinkedHashMap<>();
+                for (TeacherCompetitionScore score : allScores) {
+                    Long uid = score.getTeacherUserId();
+                    if (uid == null) continue;
+                    BigDecimal displayScore = score.getPersonalScore() != null ? score.getPersonalScore() : BigDecimal.ZERO;
+                    if (score.getIsLeader() != null && score.getIsLeader() == 1) {
+                        displayScore = displayScore.add(new BigDecimal("2"));
+                    }
+                    teacherTotalMap.merge(uid, displayScore, BigDecimal::add);
+                    if (!teacherNameMap.containsKey(uid)) {
+                        User u = userMapper.selectOneById(uid);
+                        teacherNameMap.put(uid, u != null ? u.getUserName() : String.valueOf(uid));
+                    }
+                }
+
+                // 按总分降序排列
+                List<Map.Entry<Long, BigDecimal>> sortedEntries = new ArrayList<>(teacherTotalMap.entrySet());
+                sortedEntries.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+                // 写入汇总行：H列=教师姓名，I列=总得分
+                for (Map.Entry<Long, BigDecimal> entry : sortedEntries) {
+                    org.apache.poi.ss.usermodel.Row sumRow = sheet.createRow(rowIdx++);
+                    sumRow.createCell(7).setCellValue(teacherNameMap.get(entry.getKey()));
+                    sumRow.createCell(8).setCellValue(entry.getValue().doubleValue());
+                    // J列（奖励附加）暂留空，后续可根据业务规则填充
+                }
+
+                for (int i = 0; i < 10; i++) {
                     sheet.autoSizeColumn(i);
                 }
             }
