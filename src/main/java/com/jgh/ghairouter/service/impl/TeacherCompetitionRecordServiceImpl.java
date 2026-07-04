@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -105,6 +106,21 @@ public class TeacherCompetitionRecordServiceImpl
 
     /** 默认记录类型 */
     private static final String DEFAULT_TYPE_NAME = "教师获奖";
+
+    // ==================== 删除（代码层面软删除级联） ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean removeById(Serializable id) {
+        // 1. 软删除子表得分明细记录
+        teacherScoreMapper.deleteByQuery(
+                QueryWrapper.create().eq("record_id", id));
+        // 2. 软删除审核记录
+        auditMapper.deleteByQuery(
+                QueryWrapper.create().eq("record_id", id).eq("record_type", DEFAULT_TYPE_NAME));
+        // 3. 软删除主表记录
+        return super.removeById(id);
+    }
 
     // ==================== 用户提交比赛记录 ====================
 

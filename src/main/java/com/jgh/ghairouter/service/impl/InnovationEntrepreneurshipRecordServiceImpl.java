@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -51,6 +52,21 @@ public class InnovationEntrepreneurshipRecordServiceImpl
     private InnovationEntrepreneurshipScoreMapper innovationScoreMapper;
 
     private static final String DEFAULT_TYPE_NAME = "大创业绩";
+
+    // ==================== 删除（代码层面软删除级联） ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean removeById(Serializable id) {
+        // 1. 软删除子表得分明细记录
+        innovationScoreMapper.deleteByQuery(
+                QueryWrapper.create().eq("record_id", id));
+        // 2. 软删除审核记录
+        auditMapper.deleteByQuery(
+                QueryWrapper.create().eq("record_id", id).eq("record_type", DEFAULT_TYPE_NAME));
+        // 3. 软删除主表记录
+        return super.removeById(id);
+    }
 
     @Transactional(rollbackFor = Exception.class)
     @Override

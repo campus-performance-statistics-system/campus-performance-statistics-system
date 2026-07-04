@@ -29,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -50,6 +51,18 @@ public class ExcellentGraduationProjectRecordServiceImpl
     private TeacherCompetitionAuditRecordMapper auditMapper;
 
     private static final String DEFAULT_TYPE_NAME = ExcellentGraduationProjectScoringConstants.TYPE_NAME;
+
+    // ==================== 删除（代码层面软删除级联） ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean removeById(Serializable id) {
+        // 1. 软删除审核记录
+        auditMapper.deleteByQuery(
+                QueryWrapper.create().eq("record_id", id).eq("record_type", DEFAULT_TYPE_NAME));
+        // 2. 软删除主表记录
+        return super.removeById(id);
+    }
 
     @Transactional(rollbackFor = Exception.class)
     @Override
