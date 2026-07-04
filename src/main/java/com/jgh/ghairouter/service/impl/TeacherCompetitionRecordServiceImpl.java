@@ -658,9 +658,19 @@ public class TeacherCompetitionRecordServiceImpl
                             for (int i = 0; i < vo.getTeacherScores().size(); i++) {
                                 if (i > 0) sb.append("、");
                                 TeacherScoreVO ts = vo.getTeacherScores().get(i);
-                                sb.append(ts.getUserName()).append("（")
-                                        .append(ts.getPersonalScore().stripTrailingZeros().toPlainString())
-                                        .append("）");
+                                sb.append(ts.getUserName()).append("（");
+                                if (ts.getIsLeader() != null && ts.getIsLeader() == 1) {
+                                    // 负责人：显示"2+X"格式，2=基础分，X=获奖加分
+                                    BigDecimal bonus = ts.getPersonalScore().subtract(new BigDecimal("2"));
+                                    if (bonus.compareTo(BigDecimal.ZERO) > 0) {
+                                        sb.append("2+").append(bonus.stripTrailingZeros().toPlainString());
+                                    } else {
+                                        sb.append("2");
+                                    }
+                                } else {
+                                    sb.append(ts.getPersonalScore().stripTrailingZeros().toPlainString());
+                                }
+                                sb.append("）");
                             }
                         }
                         row.createCell(5).setCellValue(sb.toString());
