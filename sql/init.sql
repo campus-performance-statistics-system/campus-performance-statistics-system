@@ -607,3 +607,134 @@ CREATE TABLE IF NOT EXISTS school_enterprise_training_record
     INDEX idx_advisor_name (advisor_name)
 ) COMMENT '校企联合培养记录表（v17）' COLLATE utf8mb4_unicode_ci;
 
+-- ===================== 外键约束：得分明细表级联删除 =====================
+-- 当主表比赛记录被删除时，对应的得分明细记录也自动删除
+
+-- 教师获奖 → 教师个人得分明细
+ALTER TABLE user_competition_score
+    ADD CONSTRAINT fk_user_competition_score_record
+        FOREIGN KEY (record_id) REFERENCES teacher_competition_record (id)
+            ON DELETE CASCADE;
+
+-- 指导学生科技竞赛 → 指导老师得分明细
+ALTER TABLE advisor_score
+    ADD CONSTRAINT fk_advisor_score_record
+        FOREIGN KEY (record_id) REFERENCES student_competition_record (id)
+            ON DELETE CASCADE;
+
+-- 指导实训 → 指导实训得分明细
+ALTER TABLE training_guidance_score
+    ADD CONSTRAINT fk_training_guidance_score_record
+        FOREIGN KEY (record_id) REFERENCES training_guidance_record (id)
+            ON DELETE CASCADE;
+
+-- 科研及教材业绩 → 科研及教材业绩得分明细
+ALTER TABLE research_achievement_score
+    ADD CONSTRAINT fk_research_achievement_score_record
+        FOREIGN KEY (record_id) REFERENCES research_achievement_record (id)
+            ON DELETE CASCADE;
+
+-- 大创业绩 → 大创业绩得分明细
+ALTER TABLE innovation_entrepreneurship_score
+    ADD CONSTRAINT fk_innovation_entrepreneurship_score_record
+        FOREIGN KEY (record_id) REFERENCES innovation_entrepreneurship_record (id)
+            ON DELETE CASCADE;
+
+-- 教改科研项目业绩 → 教改科研项目业绩得分明细
+ALTER TABLE teaching_reform_score
+    ADD CONSTRAINT fk_teaching_reform_score_record
+        FOREIGN KEY (record_id) REFERENCES teaching_reform_record (id)
+            ON DELETE CASCADE;
+
+-- 论文业绩 → 论文业绩得分明细
+ALTER TABLE thesis_score
+    ADD CONSTRAINT fk_thesis_score_record
+        FOREIGN KEY (record_id) REFERENCES thesis_record (id)
+            ON DELETE CASCADE;
+
+-- 体育比赛业绩 → 体育比赛业绩得分明细
+ALTER TABLE sports_event_score
+    ADD CONSTRAINT fk_sports_event_score_record
+        FOREIGN KEY (record_id) REFERENCES sports_event_record (id)
+            ON DELETE CASCADE;
+
+-- 兼职班主任 → 兼职班主任业绩得分明细
+ALTER TABLE part_time_class_advisor_score
+    ADD CONSTRAINT fk_part_time_class_advisor_score_record
+        FOREIGN KEY (record_id) REFERENCES part_time_class_advisor_record (id)
+            ON DELETE CASCADE;
+
+-- ===================== 触发器：删除比赛记录时级联删除审核记录 =====================
+-- competition_audit_record 的 record_id 是多态关联，无法用外键约束，通过触发器实现级联删除
+
+DROP TRIGGER IF EXISTS trg_teacher_competition_record_delete;
+CREATE TRIGGER trg_teacher_competition_record_delete
+    BEFORE DELETE ON teacher_competition_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '教师获奖';
+END;
+
+DROP TRIGGER IF EXISTS trg_student_competition_record_delete;
+CREATE TRIGGER trg_student_competition_record_delete
+    BEFORE DELETE ON student_competition_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '指导学生科技竞赛';
+END;
+
+DROP TRIGGER IF EXISTS trg_training_guidance_record_delete;
+CREATE TRIGGER trg_training_guidance_record_delete
+    BEFORE DELETE ON training_guidance_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '指导实训';
+END;
+
+DROP TRIGGER IF EXISTS trg_research_achievement_record_delete;
+CREATE TRIGGER trg_research_achievement_record_delete
+    BEFORE DELETE ON research_achievement_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '科研及教材业绩';
+END;
+
+DROP TRIGGER IF EXISTS trg_innovation_entrepreneurship_record_delete;
+CREATE TRIGGER trg_innovation_entrepreneurship_record_delete
+    BEFORE DELETE ON innovation_entrepreneurship_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '大创业绩';
+END;
+
+DROP TRIGGER IF EXISTS trg_teaching_reform_record_delete;
+CREATE TRIGGER trg_teaching_reform_record_delete
+    BEFORE DELETE ON teaching_reform_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '教改科研项目业绩';
+END;
+
+DROP TRIGGER IF EXISTS trg_thesis_record_delete;
+CREATE TRIGGER trg_thesis_record_delete
+    BEFORE DELETE ON thesis_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '论文业绩';
+END;
+
+DROP TRIGGER IF EXISTS trg_sports_event_record_delete;
+CREATE TRIGGER trg_sports_event_record_delete
+    BEFORE DELETE ON sports_event_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '体育比赛业绩';
+END;
+
+DROP TRIGGER IF EXISTS trg_part_time_class_advisor_record_delete;
+CREATE TRIGGER trg_part_time_class_advisor_record_delete
+    BEFORE DELETE ON part_time_class_advisor_record
+    FOR EACH ROW
+BEGIN
+    DELETE FROM competition_audit_record WHERE record_id = OLD.id AND record_type = '兼职班主任';
+END;
