@@ -16,7 +16,7 @@ spring:
   # AI API Key（通过环境变量注入）
   ai:
     dashscope:
-      api-key: sk-c39704ec7be54cbaad69650f2c0b4ff6
+      api-key: ${QWEN_API_KEY:YOUR_QWEN_API_KEY}
 
 # MyBatis Flex：生产环境不打印 SQL
 mybatis-flex:
